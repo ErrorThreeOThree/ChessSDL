@@ -7,6 +7,10 @@
 
 #define BOARD_SIDE_LENGTH 8
 
+typedef struct {
+	u8 x, y;
+} pos;
+
 typedef enum {
 	WHITE = 1 << 0,
 	PAWN = 1 << 1,
@@ -18,20 +22,27 @@ typedef enum {
 } piece_type_bm;
 
 typedef struct chess {
-	bool is_white_turn;
+	bool is_whites_turn;
 	bool white_king_moved;
+	bool white_rook_0_moved;
+	bool white_rook_7_moved;
+	bool white_checked_before;
 	bool black_king_moved;
-	u32 board[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
+	bool black_rook_0_moved;
+	bool black_rook_7_moved;
+	bool black_checked_before;
+	bool is_check;
+	u8 board[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
 } chess;
 
 typedef struct {
-	chess before, after;
-	u8 x, y;
+	chess c;
+	pos to;
 } move;
 
 chess * init_chess(chess *c);
 
-llist *piece_moves(const chess *c, u8 x, u8 y);
+llist *get_moves_by_pos(const chess *c, pos p);
 
 move * is_legal_move(move *m);
 

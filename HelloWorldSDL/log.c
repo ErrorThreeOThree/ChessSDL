@@ -11,6 +11,7 @@ static FILE* log_file;
 
 static bool create_log_file(void)
 {
+	return false;
 	u32 i;
 	char* log_file_name = malloc(sizeof(LOG_FILE) + (sizeof (u32) * 2));
 	if (!log_file_name) {
