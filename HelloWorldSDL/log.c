@@ -3,13 +3,11 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <windows.h>
-#include <tchar.h>
-#include <fileapi.h>
+
 #include "log.h"
 #include "types.h"
 
 static FILE* log_file;
-
 
 static bool create_log_file(void)
 {
@@ -24,11 +22,16 @@ static bool create_log_file(void)
 
 	i = 0;
 	// check if log file exists. If yes, move it
-	if (0 == GetFileAttributesA(log_file_name)) {
+	// TODO moving file does not work, always overrides log file instead
+	printf("Checking if file %s exists...", log_file_name);
+	if (0xFFFFFFFF == GetFileAttributesA(log_file_name)) {
+
 		while (!GetFileAttributesA(log_file_name)) {
+			printf("... File %s exists!\n", log_file_name);
 			sprintf(log_file_name, "%s%" PRIu32 "X", LOG_FILE, i);
 			i++;
 		}
+		printf("... File %s does not exists!\n", log_file_name);
 		sprintf(log_file_name, "%s%" PRIu32 "X", LOG_FILE, i);
 
 		if (!rename(LOG_FILE, log_file_name)) {
