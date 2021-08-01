@@ -21,31 +21,28 @@ typedef enum {
 	KING = 1 << 6
 } piece_type_bm;
 
-typedef struct chess {
+typedef struct {
 	bool is_whites_turn;
-	bool white_king_moved;
-	bool white_rook_0_moved;
-	bool white_rook_7_moved;
-	bool white_checked_before;
-	bool black_king_moved;
-	bool black_rook_0_moved;
-	bool black_rook_7_moved;
-	bool black_checked_before;
-	bool is_check;
+	bool white_castle_l_possible;
+	bool white_castle_r_possible;
+	bool black_castle_l_possible;
+	bool black_castle_r_possible;
 	u8 board[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
 } chess;
 
 typedef struct {
-	chess c;
+	chess before;
+	chess after;
+	pos from;
 	pos to;
 } move;
 
 chess * init_chess(chess *c);
 
-llist *get_moves_by_pos(const chess *c, pos p);
+dllist *valid_moves_starting_from(const chess *c, pos p);
 
 move * is_legal_move(move *m);
 
-bool * try_move(chess *c, move *m, llist *history);
+bool * try_move(chess *c, move *m, dllist *history);
 
 #endif

@@ -3,12 +3,15 @@
 
 #include <stdbool.h>
 
-typedef struct llist {
+typedef struct dllist {
 	void *data;
-	struct llist *next;
-} llist;
+	struct dllist *next;
+	struct dllist *prev;
+} dllist;
 
-llist *llist_insert_last(llist *list, void *data);
+dllist *dllist_insert_last(dllist *list, void *data);
 
-void llist_destroy(llist *list, bool free_data);
+void dllist_destroy(dllist *list, bool free_data);
+
+dllist *dllist_filter(dllist *list, bool (filter_fn (void *data)));
 #endif
