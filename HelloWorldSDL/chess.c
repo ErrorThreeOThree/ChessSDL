@@ -3,6 +3,7 @@
 
 #include "chess.h"
 #include "log.h"
+#include <stdio.h>
 
 typedef enum {
 	TARGET_EMPTY = 1 << 0,
@@ -42,6 +43,21 @@ chess * init_chess(chess *c) {
 	return c;
 }
 
+dllist *valid_moves(const chess *c)
+{
+	pos p;
+	dllist *moves = NULL, *new_moves = NULL;
+	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
+		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
+			new_moves = valid_moves_starting_from(c, p);
+			dllist_insert_last(&moves, new_moves);
+			printf("Number of new moves: %llu\n", dllist_size(new_moves));
+			printf("Number of total moves: %llu\n", dllist_size(moves));
+		}
+	}
+	return moves;
+}
+
 dllist *valid_moves_starting_from(const chess *c, pos p)
 {
 	dllist *moves = unchecked_moves_starting_from(c, p);
@@ -74,8 +90,8 @@ dllist *unchecked_moves_starting_from(const chess *c, pos p)
 		}
 
 		// check attacks left and right
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + (c->active_color == WHITE ? 1 : -1) }, &moves, TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + (c->active_color == WHITE ? 1 : -1) }, &moves, TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + (c->active_color == WHITE ? 1 : -1) }, &moves, TARGET_ENEMY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + (c->active_color == WHITE ? 1 : -1) }, &moves, TARGET_ENEMY);
 
 		break;
 
@@ -166,12 +182,9 @@ dllist *unchecked_moves_starting_from(const chess *c, pos p)
 
 bool check_target_valid(const chess *c, pos to, move_target target_types)
 {
-	bool target_empty_statisfied = (target_types & TARGET_EMPTY)
-		&& NONE == c->board[to.y][to.x].c;
-	bool target_enemy_statisfied = (target_types & TARGET_ENEMY)
-		&& NONE != c->board[to.y][to.x].c && c->active_color != c->board[to.y][to.x].c;
-
-	return (0 <= to.x && to.x < BOARD_SIDE_LENGTH && 0 <= to.y && to.y < BOARD_SIDE_LENGTH) && (target_enemy_statisfied || target_empty_statisfied);
+	return (0 <= to.x && to.x < BOARD_SIDE_LENGTH && 0 <= to.y && to.y < BOARD_SIDE_LENGTH)
+		&& ((target_types & TARGET_EMPTY)	&& NONE == c->board[to.y][to.x].c
+			|| ((target_types & TARGET_ENEMY)	&& NONE != c->board[to.y][to.x].c && c->active_color != c->board[to.y][to.x].c));
 }
 
 bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, move_target target_types)

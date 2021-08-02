@@ -6,10 +6,15 @@
 
 u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data);
 
+// TODO: implement dllist_concat!
+
 dllist ** dllist_insert_last(dllist **list, void *data)
 {
 	u64 i = 0;
 	dllist *tmp;
+
+	if (!data)
+		return list;
 
 	ASSERT_ERROR (list, "Argument list is NULL!");
 	if (!*list) {
@@ -44,7 +49,6 @@ void dllist_destroy(dllist *list, bool free_data)
 {
 	u64 depth;
 	if (!list) {
-		LOG_WARNING ("list is NULL");
 		return;
 	}
 	LOG_DEBUG ("Destroying list at address %p %s", list, free_data?"and freeing data":"");
@@ -76,6 +80,7 @@ dllist * dllist_filter(dllist *list, bool (filter_fn (void *data)))
 			if (list->prev)
 				list->prev->next = list->next;
 		}
+		list = list->next;
 	}
 	return list;
 }
@@ -89,4 +94,14 @@ bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)))
 		list = list->next;
 	}
 	return false;
+}
+
+u64 dllist_size(const dllist *list)
+{
+	u64 size = 0;
+	while (list) {
+		size++;
+		list = list->next;
+	}
+	return size;
 }

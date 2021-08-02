@@ -68,4 +68,6 @@ chess * init_chess(chess *c);
 
 dllist * valid_moves_starting_from(const chess *c, pos p);
 
+dllist * valid_moves(const chess *c);
+
 #endif

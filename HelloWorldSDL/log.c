@@ -71,8 +71,8 @@ void log_this(
 		vfprintf(log_file, fmt, args);
 		fprintf(log_file, "\n");
 	}
-	printf("%s %s %s %s():% 4ld: ", time, severity, file, func, line);
-	vprintf(fmt, args);
-	printf("\n");
+	//printf("%s %s %s %s():% 4ld: ", time, severity, file, func, line);
+	//vprintf(fmt, args);
+	//printf("\n");
 	va_end(args);
 }
