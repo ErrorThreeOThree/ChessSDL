@@ -9,9 +9,12 @@ typedef struct dllist {
 	struct dllist *prev;
 } dllist;
 
-dllist *dllist_insert_last(dllist *list, void *data);
+dllist ** dllist_insert_last(dllist **list, void *data);
 
 void dllist_destroy(dllist *list, bool free_data);
 
 dllist *dllist_filter(dllist *list, bool (filter_fn (void *data)));
+
+bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)));
+
 #endif

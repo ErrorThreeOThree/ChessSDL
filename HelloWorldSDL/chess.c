@@ -17,26 +17,27 @@ bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, 
 bool check_target_valid(const chess *c, pos to, move_target target_types);
 
 chess * init_chess(chess *c) {
-	piece board_initial_state[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH] =
+	chess chess_initial_state =
 	{
-		{(piece) { WHITE, ROOK }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, BISHOP }, (piece) { WHITE, QUEEN }, (piece) { WHITE, KING }, (piece) { WHITE, BISHOP }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, ROOK }},
-		{(piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }},
-		{0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0, 0, 0},
-		{(piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }},
-		{(piece) { BLACK, ROOK }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, BISHOP }, (piece) { BLACK, QUEEN }, (piece) { BLACK, KING }, (piece) { BLACK, BISHOP }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, ROOK }},
+		WHITE,
+		true,
+		true,
+		true,
+		true,
+		{
+			{(piece) { WHITE, ROOK }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, BISHOP }, (piece) { WHITE, QUEEN }, (piece) { WHITE, KING }, (piece) { WHITE, BISHOP }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, ROOK }},
+			{(piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }},
+			{0, 0, 0, 0, 0, 0, 0, 0},
+			{0, 0, 0, 0, 0, 0, 0, 0},
+			{0, 0, 0, 0, 0, 0, 0, 0},
+			{0, 0, 0, 0, 0, 0, 0, 0},
+			{(piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }},
+			{(piece) { BLACK, ROOK }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, BISHOP }, (piece) { BLACK, QUEEN }, (piece) { BLACK, KING }, (piece) { BLACK, BISHOP }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, ROOK }},
+		}
 	};
 
 	ASSERT_ERROR (c, "Argument c was NULL");
-
-	bool white_castle_l_possible = true;
-	bool white_castle_r_possible = true;
-	bool black_castle_l_possible = true;
-	bool black_castle_r_possible = true;
-
-	ASSERT_ERROR (memcpy(c->board, &board_initial_state, sizeof (board_initial_state)), "Memcpy returned NULL");
+	ASSERT_ERROR (memcpy(c, &chess_initial_state, sizeof (chess)), "Memcpy returned NULL");
 
 	return c;
 }
@@ -182,8 +183,9 @@ bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, 
 		memcpy(&m->before, c, sizeof (chess));
 		memcpy(&m->after, c, sizeof (chess));
 		m->after.board[to.y][to.x] = m->before.board[from.y][from.x];
-		m->before.board[from.y][from.x].c = NONE;
-		m->before.board[from.y][from.x].t = EMPTY;
+		m->after.board[from.y][from.x].c = NONE;
+		m->after.board[from.y][from.x].t = EMPTY;
+		m->after.active_color = (m->before.active_color == WHITE) ? BLACK : WHITE;
 
 		if (WHITE == m->before.active_color) {
 			m->after.white_castle_l_possible |= (from.x == 0 && from.y == 0 || from.x == 4 && from.y == 0);
@@ -193,15 +195,39 @@ bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, 
 			m->after.black_castle_r_possible |= (from.x == 7 && from.y == 7 || from.x == 4 && from.y == 7);
 		}
 
-		dllist_insert_last(*moves, m);
+		dllist_insert_last(moves, m);
 		return true;
 	}
 	return false;
 }
 
+bool check_winning_move(const move *m)
+{
+	pos king_pos;
+
+	for (king_pos.y = 0; king_pos.y < BOARD_SIDE_LENGTH; ++king_pos.y) {
+		for (king_pos.x = 0; king_pos.x < BOARD_SIDE_LENGTH; ++king_pos.x) {
+			if (m->after.board[king_pos.y][king_pos.x].c == m->after.active_color && m->after.board[king_pos.y][king_pos.x].t == KING)
+				return false;
+		}
+	}
+	return true;
+}
+
 bool filter_check_own_check_after_move(move *m)
 {
+	pos attacker_pos;
+	dllist *moves;
 	ASSERT_ERROR (m, "Argument is NULL");
-	// TODO
-	return false;
+	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
+		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
+			moves = unchecked_moves_starting_from(&m->after, attacker_pos);
+			if (dllist_exists(moves, &check_winning_move)) {
+				dllist_destroy(moves, true);
+				return false;
+			}
+			dllist_destroy(moves, true);
+		}
+	}
+	return true;
 }

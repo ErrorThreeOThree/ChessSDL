@@ -6,31 +6,36 @@
 
 u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data);
 
-dllist *dllist_insert_last(dllist *list, void *data)
+dllist ** dllist_insert_last(dllist **list, void *data)
 {
 	u64 i = 0;
-	if (!list) {
+	dllist *tmp;
 
-		list = calloc(1, sizeof (dllist));
+	ASSERT_ERROR (list, "Argument list is NULL!");
+	if (!*list) {
 
-		ASSERT_ERROR (list, "Creating new list failed");
+		*list = calloc(1, sizeof (dllist));
+
+		ASSERT_ERROR (*list, "Creating new list failed");
 		LOG_DEBUG ("Creating new list at address %p", list);
 
-		list->data = data;
+		(*list)->data = data;
 
 		return list;
 	}
 
-	while (list->next) {
-		list = list->next;
+	tmp = *list;
+
+	while (tmp->next) {
+		tmp = tmp->next;
 		++i;
 	}
 
-	list->next = calloc(1, sizeof (dllist));
-	ASSERT_ERROR (list->next, "Creating new list element failed");
+	tmp->next = calloc(1, sizeof (dllist));
+	ASSERT_ERROR (tmp->next, "Creating new list element failed");
 	LOG_DEBUG ("Creating new list element nr %u to list %p", i, list);
 
-	list->next->data = data;
+	tmp->next->data = data;
 
 	return list;
 }
@@ -60,7 +65,7 @@ u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data)
 	return depth + cnt;
 }
 
-dllist *dllist_filter(dllist *list, bool *(filter_fn (void *data)))
+dllist * dllist_filter(dllist *list, bool (filter_fn (void *data)))
 {
 	dllist *tmp;
 	while (list) {
@@ -73,4 +78,15 @@ dllist *dllist_filter(dllist *list, bool *(filter_fn (void *data)))
 		}
 	}
 	return list;
+}
+
+bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)))
+{
+	while (list) {
+		if (exists_fn(list)) {
+			return true;
+		}
+		list = list->next;
+	}
+	return false;
 }
