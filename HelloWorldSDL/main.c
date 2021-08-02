@@ -14,7 +14,7 @@ int main(int argc, char **argv)
 	{
 		LOG_DEBUG ("Argument %d \"%s\"", argc, argv);
 	}
-	chess_state c;
+	chess c;
 	pos p;
 
 	init_chess(&c);

@@ -67,13 +67,13 @@ typedef struct {
 
 typedef struct {
 	dllist *history;
-	chess_state *current_state;
+	chess_state current_state;
 } chess;
 
-chess_state * init_chess(chess_state *c);
+chess * init_chess(chess *c);
 
-dllist * valid_moves_starting_from(const chess_state *c, pos p);
+dllist * valid_moves(const chess *c);
 
-dllist * valid_moves(const chess_state *c);
+dllist *valid_moves_starting_from(const chess *c, pos p);
 
 #endif

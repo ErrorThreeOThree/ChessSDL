@@ -4,7 +4,7 @@
 #include "log.h"
 #include "types.h"
 
-u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data);
+static u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data);
 
 dllist *ddlist_concat(dllist *front, dllist *end)
 {
@@ -37,7 +37,7 @@ dllist **dllist_insert_head(dllist **list, void *data)
 
 		*list = calloc(1, sizeof (dllist));
 
-		ASSERT_ERROR (*list, "Creating new list failed");
+		ASSERT_ERROR (*list, "Creating new list: calloc failed!");
 		LOG_DEBUG ("Creating new list at address %p", list);
 
 		(*list)->data = data;
@@ -104,7 +104,7 @@ void dllist_destroy(dllist *list, bool free_data)
 	LOG_DEBUG ("Freed %u list elements", depth);
 }
 
-u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data)
+static u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data)
 {
 	u64 depth = 0;
 	ASSERT_WARNING (cnt == 100, "Reached recursive iteration 100");
