@@ -12,22 +12,49 @@ typedef struct {
 } pos;
 
 typedef enum {
-	WHITE = 1 << 0,
-	PAWN = 1 << 1,
-	ROOK = 1 << 2,
-	KNIGHT = 1 << 3,
-	BISHOP = 1 << 4,
-	QUEEN = 1 << 5,
-	KING = 1 << 6
-} piece_type_bm;
+	NONE = 0,
+	WHITE,
+	BLACK,
+	PIECE_COLOR_MAX
+} piece_color;
+
+static inline const char *piece_color_string(piece_color c)
+{
+	static const char *s[] = {"none", "white", "black", "invalid"};
+	ASSERT_WARNING (c == PIECE_COLOR_MAX, "Invalid value PIECE_COLOR_MAX");
+	return s[c];
+}
+
+typedef enum {
+	EMPTY = 0,
+	PAWN,
+	ROOK,
+	KNIGHT,
+	BISHOP,
+	QUEEN,
+	KING,
+	PIECE_TYPE_MAX
+} piece_type;
+
+static inline const char *piece_type_string(piece_type t)
+{
+	static const char *s[] = {"none","pawn","rook","knight","bishop","queen","king", "invalid"};
+	ASSERT_WARNING (t == PIECE_TYPE_MAX, "Invalid value PIECE_COLOR_MAX");
+	return s[t];
+}
 
 typedef struct {
-	bool is_whites_turn;
+	piece_color c;
+	piece_type t;
+} piece;
+
+typedef struct {
+	piece_color active_color;
 	bool white_castle_l_possible;
 	bool white_castle_r_possible;
 	bool black_castle_l_possible;
 	bool black_castle_r_possible;
-	u8 board[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
+	piece board[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
 } chess;
 
 typedef struct {
@@ -40,9 +67,5 @@ typedef struct {
 chess * init_chess(chess *c);
 
 dllist *valid_moves_starting_from(const chess *c, pos p);
-
-move * is_legal_move(move *m);
-
-bool * try_move(chess *c, move *m, dllist *history);
 
 #endif
