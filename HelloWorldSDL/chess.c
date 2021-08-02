@@ -11,21 +11,21 @@ typedef enum {
 	TARGET_ALLY = 1 << 2
 } move_target;
 
-dllist *unchecked_moves_starting_from(const chess *c, pos p);
-bool filter_check_own_check_after_move(void *m);
-bool check_target_valid(const chess *c, pos to, move_target target_types);
-bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, move_target target_types);
-bool check_target_valid(const chess *c, pos to, move_target target_types);
+dllist *unchecked_moves_starting_from(const chess_state *c, pos p);
+bool filter_check_own_check_after_move(move *m);
+bool check_target_valid(const chess_state *c, pos to, move_target target_types);
+bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist **moves, move_target target_types);
+bool check_target_valid(const chess_state *c, pos to, move_target target_types);
 
-chess * init_chess(chess *c) {
-	chess chess_initial_state =
+chess_state * init_chess(chess_state *c) {
+	chess_state chess_initial_state =
 	{
-		WHITE,
-		true,
-		true,
-		true,
-		true,
-		{
+		.active_color = WHITE,
+		.white_castle_l_possible = true,
+		.white_castle_r_possible = true,
+		.black_castle_l_possible = true,
+		.black_castle_r_possible = true,
+		.board = {
 			{(piece) { WHITE, ROOK }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, BISHOP }, (piece) { WHITE, QUEEN }, (piece) { WHITE, KING }, (piece) { WHITE, BISHOP }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, ROOK }},
 			{(piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }},
 			{0, 0, 0, 0, 0, 0, 0, 0},
@@ -38,19 +38,19 @@ chess * init_chess(chess *c) {
 	};
 
 	ASSERT_ERROR (c, "Argument c was NULL");
-	ASSERT_ERROR (memcpy(c, &chess_initial_state, sizeof (chess)), "Memcpy returned NULL");
+	ASSERT_ERROR (memcpy(c, &chess_initial_state, sizeof (chess_state)), "Memcpy returned NULL");
 
 	return c;
 }
 
-dllist *valid_moves(const chess *c)
+dllist *valid_moves(const chess_state *c)
 {
 	pos p;
 	dllist *moves = NULL, *new_moves = NULL;
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			new_moves = valid_moves_starting_from(c, p);
-			dllist_insert_last(&moves, new_moves);
+			moves = ddlist_concat(moves, new_moves);
 			printf("Number of new moves: %llu\n", dllist_size(new_moves));
 			printf("Number of total moves: %llu\n", dllist_size(moves));
 		}
@@ -58,7 +58,7 @@ dllist *valid_moves(const chess *c)
 	return moves;
 }
 
-dllist *valid_moves_starting_from(const chess *c, pos p)
+dllist *valid_moves_starting_from(const chess_state *c, pos p)
 {
 	dllist *moves = unchecked_moves_starting_from(c, p);
 
@@ -68,7 +68,7 @@ dllist *valid_moves_starting_from(const chess *c, pos p)
 }
 
 
-dllist *unchecked_moves_starting_from(const chess *c, pos p)
+dllist *unchecked_moves_starting_from(const chess_state *c, pos p)
 {
 	dllist *moves = NULL;
 	u8 x_target, y_target;
@@ -180,21 +180,21 @@ dllist *unchecked_moves_starting_from(const chess *c, pos p)
 	return moves;
 }
 
-bool check_target_valid(const chess *c, pos to, move_target target_types)
+bool check_target_valid(const chess_state *c, pos to, move_target target_types)
 {
 	return (0 <= to.x && to.x < BOARD_SIDE_LENGTH && 0 <= to.y && to.y < BOARD_SIDE_LENGTH)
 		&& ((target_types & TARGET_EMPTY)	&& NONE == c->board[to.y][to.x].c
 			|| ((target_types & TARGET_ENEMY)	&& NONE != c->board[to.y][to.x].c && c->active_color != c->board[to.y][to.x].c));
 }
 
-bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, move_target target_types)
+bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist **moves, move_target target_types)
 {
 	move *m;
 	if (check_target_valid(c, to, target_types)) {
 		m = calloc(1, sizeof (move));
 		ASSERT_ERROR (m, "calloc returned NULL!");
-		memcpy(&m->before, c, sizeof (chess));
-		memcpy(&m->after, c, sizeof (chess));
+		memcpy(&m->before, c, sizeof (chess_state));
+		memcpy(&m->after, c, sizeof (chess_state));
 		m->after.board[to.y][to.x] = m->before.board[from.y][from.x];
 		m->after.board[from.y][from.x].c = NONE;
 		m->after.board[from.y][from.x].t = EMPTY;
@@ -208,7 +208,7 @@ bool add_move_if_target_valid(const chess *c, pos from, pos to, dllist **moves, 
 			m->after.black_castle_r_possible |= (from.x == 7 && from.y == 7 || from.x == 4 && from.y == 7);
 		}
 
-		dllist_insert_last(moves, m);
+		dllist_insert_head(moves, m);
 		return true;
 	}
 	return false;

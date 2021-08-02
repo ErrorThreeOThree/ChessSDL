@@ -9,7 +9,12 @@
 int main(int argc, char **argv)
 {
 	LOG_INFO ("Starting program");
-	chess c;
+	LOG_DEBUG ("Got arguments:");
+	while (argc--)
+	{
+		LOG_DEBUG ("Argument %d \"%s\"", argc, argv);
+	}
+	chess_state c;
 	pos p;
 
 	init_chess(&c);

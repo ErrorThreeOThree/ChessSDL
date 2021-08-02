@@ -7,11 +7,12 @@
 #include "log.h"
 #include "types.h"
 
+// TODO fix logging system: vprintf is sometimes stuck, no backup of previous log files.
+
 static FILE* log_file;
 
 static bool create_log_file(void)
 {
-	return false;
 	u32 i;
 	char* log_file_name = malloc(sizeof(LOG_FILE) + (sizeof (u32) * 2));
 	if (!log_file_name) {
@@ -71,8 +72,8 @@ void log_this(
 		vfprintf(log_file, fmt, args);
 		fprintf(log_file, "\n");
 	}
-	//printf("%s %s %s %s():% 4ld: ", time, severity, file, func, line);
-	//vprintf(fmt, args);
-	//printf("\n");
+	printf("%s %s %s %s():% 4ld: ", time, severity, file, func, line);
+	vprintf(fmt, args);
+	printf("\n");
 	va_end(args);
 }

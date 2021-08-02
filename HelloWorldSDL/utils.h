@@ -10,7 +10,7 @@ typedef struct dllist {
 	struct dllist *prev;
 } dllist;
 
-dllist ** dllist_insert_last(dllist **list, void *data);
+dllist **dllist_insert_tail(dllist **list, void *data);
 
 void dllist_destroy(dllist *list, bool free_data);
 
@@ -19,5 +19,9 @@ dllist *dllist_filter(dllist *list, bool (filter_fn (void *data)));
 bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)));
 
 u64 dllist_size(const dllist *list);
+
+dllist *ddlist_concat(dllist *front, dllist *end);
+
+dllist **dllist_insert_head(dllist **list, void *data);
 
 #endif

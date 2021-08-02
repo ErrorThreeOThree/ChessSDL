@@ -6,11 +6,59 @@
 
 u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data);
 
-// TODO: implement dllist_concat!
-
-dllist ** dllist_insert_last(dllist **list, void *data)
+dllist *ddlist_concat(dllist *front, dllist *end)
 {
-	u64 i = 0;
+	dllist *tmp;
+
+	if (!front)
+		return end;
+	if (!end)
+		return front;
+
+	tmp = front;
+	while (tmp->next) {
+		tmp = tmp->next;
+	}
+	tmp->next = end;
+	end->prev = tmp;
+
+	return front;
+}
+
+dllist **dllist_insert_head(dllist **list, void *data)
+{
+	dllist *tmp;
+
+	if (!data)
+		return list;
+
+	ASSERT_ERROR (list, "Argument list is NULL!");
+	if (!*list) {
+
+		*list = calloc(1, sizeof (dllist));
+
+		ASSERT_ERROR (*list, "Creating new list failed");
+		LOG_DEBUG ("Creating new list at address %p", list);
+
+		(*list)->data = data;
+
+		return list;
+	}
+
+	tmp = *list;
+	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(*list), list);
+	*list = calloc(1, sizeof (dllist));
+	ASSERT_ERROR (*list, "calloc returned NULL!");
+	(*list)->next = tmp;
+
+	if (tmp)
+		tmp->prev = *list;
+
+	return list;
+}
+
+dllist ** dllist_insert_tail(dllist **list, void *data)
+{
 	dllist *tmp;
 
 	if (!data)
@@ -31,14 +79,13 @@ dllist ** dllist_insert_last(dllist **list, void *data)
 
 	tmp = *list;
 
-	while (tmp->next) {
+	while (tmp->next)
 		tmp = tmp->next;
-		++i;
-	}
 
 	tmp->next = calloc(1, sizeof (dllist));
+	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(*list), list);
 	ASSERT_ERROR (tmp->next, "Creating new list element failed");
-	LOG_DEBUG ("Creating new list element nr %u to list %p", i, list);
+	tmp->next->prev = tmp;
 
 	tmp->next->data = data;
 
