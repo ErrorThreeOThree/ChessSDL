@@ -4,151 +4,195 @@
 #include "log.h"
 #include "types.h"
 
-static u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data);
+struct dllist_elem {
+	void *data;
+	struct dllist_elem *next;
+	struct dllist_elem *prev;
+};
 
+static dllist_elem *create_elem(const dllist *list, const void *data, dllist_elem *prev, dllist_elem *next);
+
+dllist *ddlist_init(dllist *list, void *(*clone_data) (const void *), void (*free_data) (void *))
+{
+	ASSERT_ERROR (list, "Argument list is NULL");
+	list->clone_data = clone_data;
+	list->free_data = free_data;
+	return list;
+}
+
+// removes all elements from end
 dllist *ddlist_concat(dllist *front, dllist *end)
 {
-	dllist *tmp;
-
-	if (!front)
-		return end;
-	if (!end)
-		return front;
-
-	tmp = front;
-	while (tmp->next) {
-		tmp = tmp->next;
+	ASSERT_WARNING (front->clone_data == end->clone_data && front->free_data == end->free_data, "Lists might be of different type!");
+	if (!end->head) {
+		ASSERT_ERROR (!end->tail, "No head but tail!");
+		goto EXIT;
 	}
-	tmp->next = end;
-	end->prev = tmp;
 
+	if (!front->head) {
+		ASSERT_ERROR (!front->tail, "No head but tail!");
+		front->head = end->head;
+		front->tail = end->tail;
+	} else {
+		ASSERT_ERROR (!front->tail->next, "front->tail->next is not NULL!");
+		ASSERT_ERROR (!front->head->prev, "front->head->prev is not NULL!");
+		ASSERT_ERROR (!end->head->prev, "end->head->prev is not NULL!");
+		ASSERT_ERROR (!end->tail->next, "end->tail->next is not NULL!");
+		front->tail->next = end->head;
+		end->head->prev = front->tail;
+		front->tail = end->tail;
+	}
+EXIT:
+	end->head = NULL;
+	end->tail = NULL;
 	return front;
 }
 
-dllist **dllist_insert_head(dllist **list, void *data)
+dllist *dllist_insert_head(dllist *list, const void *data)
 {
-	dllist *tmp;
+	dllist_elem *tmp;
 
 	if (!data)
 		return list;
 
 	ASSERT_ERROR (list, "Argument list is NULL!");
-	if (!*list) {
 
-		*list = calloc(1, sizeof (dllist));
+	if (!list->head) {
+		ASSERT_ERROR (!list->tail, "No head but tail!");
 
-		ASSERT_ERROR (*list, "Creating new list: calloc failed!");
-		LOG_DEBUG ("Creating new list at address %p", list);
-
-		(*list)->data = data;
+		list->head = create_elem(list, data, NULL, NULL);
+		list->tail = list->head;
 
 		return list;
 	}
 
-	tmp = *list;
-	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(*list), list);
-	*list = calloc(1, sizeof (dllist));
-	ASSERT_ERROR (*list, "calloc returned NULL!");
-	(*list)->next = tmp;
-
-	if (tmp)
-		tmp->prev = *list;
+	tmp = list->head;
+	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(list), list);
+	list->head = create_elem(list, data, NULL, tmp);
+	tmp->prev = list->head;
 
 	return list;
 }
 
-dllist ** dllist_insert_tail(dllist **list, void *data)
+dllist * dllist_insert_tail(dllist *list, const void *data)
 {
-	dllist *tmp;
+	dllist_elem *tmp;
 
 	if (!data)
 		return list;
 
 	ASSERT_ERROR (list, "Argument list is NULL!");
-	if (!*list) {
 
-		*list = calloc(1, sizeof (dllist));
-
-		ASSERT_ERROR (*list, "Creating new list failed");
-		LOG_DEBUG ("Creating new list at address %p", list);
-
-		(*list)->data = data;
-
-		return list;
+	if (!list->head) {
+		dllist_insert_head(list, data);
 	}
 
-	tmp = *list;
-
-	while (tmp->next)
-		tmp = tmp->next;
-
-	tmp->next = calloc(1, sizeof (dllist));
-	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(*list), list);
-	ASSERT_ERROR (tmp->next, "Creating new list element failed");
-	tmp->next->prev = tmp;
-
-	tmp->next->data = data;
+	tmp = list->tail;
+	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(list), list);
+	list->tail = create_elem(list, data, tmp, NULL);
+	ASSERT_ERROR (list->tail, "calloc returned NULL!");
+	tmp->next = list->tail;
 
 	return list;
 }
 
-void dllist_destroy(dllist *list, bool free_data)
+void dllist_clear_elems(dllist *list)
 {
-	u64 depth;
-	if (!list) {
+	dllist_elem *tmp;
+
+	if (!list)
 		return;
+
+	while (list->head) {
+		tmp = list->head;
+		list->head = list->head->next;
+		list->free_data(tmp->data);
+		free(tmp);
 	}
-	LOG_DEBUG ("Destroying list at address %p %s", list, free_data?"and freeing data":"");
-	depth = dllist_destroy_r(list, 0, free_data);
-
-	LOG_DEBUG ("Freed %u list elements", depth);
-}
-
-static u64 dllist_destroy_r(dllist *list, u64 cnt, bool free_data)
-{
-	u64 depth = 0;
-	ASSERT_WARNING (cnt == 100, "Reached recursive iteration 100");
-	if (list->next) depth = dllist_destroy_r(list->next, 1 + cnt, free_data);
-	if (free_data)
-		free(list->data);
-	free(list);
-
-	return depth + cnt;
+	list->head = NULL;
+	list->tail = NULL;
 }
 
 dllist * dllist_filter(dllist *list, bool (filter_fn (void *data)))
 {
-	dllist *tmp;
-	while (list) {
-		if (!filter_fn(list)) {
-			tmp = list;
-			if (list->next)
-				list->next->prev = list->prev;
-			if (list->prev)
-				list->prev->next = list->next;
+	dllist_elem *iter = NULL, *tmp;
+
+	ASSERT_ERROR (list, "Argument list is NULL!");
+
+	iter = list->head;
+	while (NULL != iter) {
+		if (!filter_fn(iter->data)) {
+			if (iter == list->head && iter == list->tail) {
+				list->head = NULL;
+				list->tail = NULL;
+			} else if (iter == list->head) {
+				ASSERT_ERROR (list->head->next, "list->head->next is NULL, although list has more than one element!");
+				list->head = list->head->next;
+				list->head->prev = NULL;
+
+			} else if (iter == list->tail) {
+				ASSERT_ERROR (list->tail->prev, "list->tail->prev is NULL, although list has more than one element!");
+				list->tail = list->tail->prev;
+				list->tail->next = NULL;
+			} else {
+				ASSERT_ERROR (iter->next, "iter->next is NULL, although list has more than two element and iter is neither head nor tail!");
+				ASSERT_ERROR (iter->prev, "iter->prev is NULL, although list has more than two element and iter is neither head nor tail!");
+				iter->prev->next = iter->next;
+				iter->next->prev = iter->prev;
+			}
+
+			tmp = iter;
+			iter = iter->next;
+			list->free_data(tmp->data);
+			free(tmp);
+		} else {
+			iter = iter->next;
 		}
-		list = list->next;
 	}
 	return list;
 }
 
 bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)))
 {
-	while (list) {
+	dllist_elem *iter;
+	for (iter = list->head; iter; iter = iter->next) {
 		if (exists_fn(list)) {
 			return true;
 		}
-		list = list->next;
 	}
 	return false;
 }
 
 u64 dllist_size(const dllist *list)
 {
+	dllist_elem *iter;
 	u64 size = 0;
-	while (list) {
+	for (iter = list->head; iter; iter = iter->next) {
 		size++;
-		list = list->next;
 	}
 	return size;
+}
+
+dllist *dllist_init(dllist *list, void *(*clone_data) (const void *), void (*free_data) (void *))
+{
+	ASSERT_ERROR (list, "Argument list is NULL!");
+	list->clone_data = clone_data;
+	list->free_data = free_data;
+	list->head = NULL;
+	list->tail = NULL;
+	
+	return list;
+}
+
+static dllist_elem *create_elem(const dllist *list, const void *data, dllist_elem *prev, dllist_elem *next)
+{
+	ASSERT_ERROR (list && data, "Argument list or data is NULL!");
+
+	dllist_elem *e = calloc(1, sizeof (dllist_elem));
+	ASSERT_ERROR (e, "Creating first list_elem: calloc failed!");
+	e->next = next;
+	e->prev = prev;
+	e->data = list->clone_data(data);
+
+	return e;
 }

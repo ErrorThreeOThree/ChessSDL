@@ -11,12 +11,14 @@ typedef enum {
 	TARGET_ALLY = 1 << 2
 } move_target;
 
-static dllist *unchecked_moves_starting_from(const chess_state *c, pos p);
+static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
 static bool filter_check_own_check_after_move(move *m);
 static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
-static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist **moves, move_target target_types);
+static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist *moves, move_target target_types);
 static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
-static dllist *state_valid_moves_starting_from(const chess_state *c, pos p);
+static dllist *state_valid_moves_starting_from(const chess_state *c, pos p, dllist *moves);
+static move *clone_move(const move *m);
+static dllist *create_movelist(void);
 
 chess * init_chess(chess *c) {
 	chess initial_state = {
@@ -50,13 +52,16 @@ chess * init_chess(chess *c) {
 dllist *valid_moves(const chess *c)
 {
 	pos p;
-	dllist *moves = NULL, *new_moves = NULL;
+	dllist *new_moves = create_movelist();
+	dllist *moves = create_movelist();
+
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
-			new_moves = state_valid_moves_starting_from(&c->current_state, p);
-			moves = ddlist_concat(moves, new_moves);
+			state_valid_moves_starting_from(&c->current_state, p, new_moves);
+			ddlist_concat(moves, new_moves);
 			printf("Number of new moves: %llu\n", dllist_size(new_moves));
 			printf("Number of total moves: %llu\n", dllist_size(moves));
+			dllist_clear_elems(new_moves);
 		}
 	}
 	return moves;
@@ -64,28 +69,28 @@ dllist *valid_moves(const chess *c)
 
 dllist *valid_moves_starting_from(const chess *c, pos p)
 {
-	return state_valid_moves_starting_from(&c->current_state, p);
+	dllist *moves = create_movelist();
+	return state_valid_moves_starting_from(&c->current_state, p, moves);
 }
 
 
-dllist *state_valid_moves_starting_from(const chess_state *c, pos p)
+dllist *state_valid_moves_starting_from(const chess_state *c, pos p, dllist *moves)
 {
-	dllist *moves = unchecked_moves_starting_from(c, p);
+	unchecked_moves_starting_from(c, p, moves);
 
 	dllist_filter(moves, &filter_check_own_check_after_move);
 
 	return moves;
 }
 
-static dllist *unchecked_moves_starting_from(const chess_state *c, pos p)
+static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
 {
-	dllist *moves = NULL;
 	u8 x_target, y_target;
 
 	ASSERT_ERROR (c && (p.x < BOARD_SIDE_LENGTH) && (p.y < BOARD_SIDE_LENGTH), "Error invalid arguments");
 
 	if (c->active_color != (c->board[p.y][p.x].c)) {
-		return NULL;
+		return moves;
 	}
 
 	switch (c->board[p.y][p.x].t) {
@@ -93,96 +98,96 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p)
 		ASSERT_ERROR (p.y > 0 && p.y < BOARD_SIDE_LENGTH - 1, "%s pawn on invalid rank %hhu", piece_color_string(c->active_color), p.y + 1);
 
 		// check move one straight
-		if (add_move_if_target_valid(c, p, (pos) { p.x, p.y + (c->active_color == WHITE ? 1 : (-1)) }, &moves, TARGET_EMPTY)) {
-			// check double move from beginning rank
-			add_move_if_target_valid(c, p, (pos) { p.x, (c->active_color == WHITE ? 3 : 4) }, &moves, TARGET_EMPTY);
+		if (add_move_if_target_valid(c, p, (pos) { p.x, p.y + (c->active_color == WHITE ? 1 : (-1)) }, moves, TARGET_EMPTY)) {
+			// check double moves from beginning rank
+			add_move_if_target_valid(c, p, (pos) { p.x, (c->active_color == WHITE ? 3 : 4) }, moves, TARGET_EMPTY);
 		}
 
 		// check attacks left and right
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + (c->active_color == WHITE ? 1 : -1) }, &moves, TARGET_ENEMY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + (c->active_color == WHITE ? 1 : -1) }, &moves, TARGET_ENEMY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + (c->active_color == WHITE ? 1 : -1) }, moves, TARGET_ENEMY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + (c->active_color == WHITE ? 1 : -1) }, moves, TARGET_ENEMY);
 
 		break;
 
 	case ROOK:
-		for (y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_EMPTY); y_target++);
-		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_ENEMY);
+		for (y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_EMPTY); y_target++);
+		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_ENEMY);
 
-		for (y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_EMPTY); y_target--);
-		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_ENEMY);
+		for (y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_EMPTY); y_target--);
+		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x + 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_EMPTY); x_target++);
-		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_ENEMY);
+		for (x_target = p.x + 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_EMPTY); x_target++);
+		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x - 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_EMPTY); x_target--);
-		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_ENEMY);
+		for (x_target = p.x - 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_EMPTY); x_target--);
+		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_ENEMY);
 
 		break;
 
 	case KNIGHT:
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + 2 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + 2 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y - 2 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y - 2 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x + 2, p.y + 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 2, p.y + 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x + 2, p.y - 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 2, p.y - 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + 2 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + 2 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y - 2 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y - 2 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 2, p.y + 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 2, p.y + 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 2, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 2, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
 		
 
 		break;
 
 	case BISHOP:
-		for (x_target = p.x + 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target++, y_target++);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x + 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target++, y_target++);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x + 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target++, y_target--);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x + 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target++, y_target--);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x - 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target--, y_target++);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x - 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target--, y_target++);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x - 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target--, y_target--);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x - 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target--, y_target--);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
 		break;
 
 	case QUEEN:
-		for (x_target = p.x + 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target++, y_target++);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x + 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target++, y_target++);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x + 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target++, y_target--);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x + 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target++, y_target--);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x - 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target--, y_target++);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x - 1, y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target--, y_target++);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x - 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_EMPTY); x_target--, y_target--);
-		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, &moves, TARGET_ENEMY);
+		for (x_target = p.x - 1, y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_EMPTY); x_target--, y_target--);
+		add_move_if_target_valid(c, p, (pos) { x_target, y_target }, moves, TARGET_ENEMY);
 
-		for (y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_EMPTY); y_target++);
-		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_ENEMY);
+		for (y_target = p.y + 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_EMPTY); y_target++);
+		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_ENEMY);
 
-		for (y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_EMPTY); y_target--);
-		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, &moves, TARGET_ENEMY);
+		for (y_target = p.y - 1; add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_EMPTY); y_target--);
+		add_move_if_target_valid(c, p, (pos) { p.x, y_target }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x + 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_EMPTY); x_target++);
-		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_ENEMY);
+		for (x_target = p.x + 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_EMPTY); x_target++);
+		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_ENEMY);
 
-		for (x_target = p.x - 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_EMPTY); x_target--);
-		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, &moves, TARGET_ENEMY);
+		for (x_target = p.x - 1; add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_EMPTY); x_target--);
+		add_move_if_target_valid(c, p, (pos) { x_target, p.y }, moves, TARGET_ENEMY);
 
 		break;
 
 	case KING:
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x, p.y + 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x, p.y - 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y - 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
-		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y - 1 }, &moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x, p.y + 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y + 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
 		break;
 	}
 
@@ -196,7 +201,7 @@ static bool check_target_valid(const chess_state *c, pos to, move_target target_
 			|| ((target_types & TARGET_ENEMY)	&& NONE != c->board[to.y][to.x].c && c->active_color != c->board[to.y][to.x].c));
 }
 
-static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist **moves, move_target target_types)
+static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist *moves, move_target target_types)
 {
 	move *m;
 	if (check_target_valid(c, to, target_types)) {
@@ -230,26 +235,43 @@ static bool check_winning_move(const move *m)
 	for (king_pos.y = 0; king_pos.y < BOARD_SIDE_LENGTH; ++king_pos.y) {
 		for (king_pos.x = 0; king_pos.x < BOARD_SIDE_LENGTH; ++king_pos.x) {
 			if (m->after.board[king_pos.y][king_pos.x].c == m->after.active_color && m->after.board[king_pos.y][king_pos.x].t == KING)
-				return false;
+				return true;
 		}
 	}
-	return true;
+	return false;
 }
 
 static bool filter_check_own_check_after_move(move *m)
 {
 	pos attacker_pos;
-	dllist *moves;
+	dllist *moves = create_movelist();
 	ASSERT_ERROR (m, "Argument is NULL");
 	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
 		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
-			moves = unchecked_moves_starting_from(&m->after, attacker_pos);
+			moves = unchecked_moves_starting_from(&m->after, attacker_pos, moves);
 			if (dllist_exists(moves, &check_winning_move)) {
-				dllist_destroy(moves, true);
+				dllist_clear_elems(moves);
+				free(moves);
 				return false;
 			}
-			dllist_destroy(moves, true);
+			dllist_clear_elems(moves);
 		}
 	}
+	free(moves);
 	return true;
+}
+
+static move *clone_move(const move *m)
+{
+	move *m_clone;
+	ASSERT_ERROR (m, "Argument m is NULL");
+	m_clone = malloc(sizeof (move));
+	ASSERT_ERROR (m_clone, "malloc returned NULL!");
+	ASSERT_ERROR (memcpy(m_clone, m, sizeof (move)), "memcpy returned NULL");
+	return m_clone;
+}
+
+static dllist *create_movelist(void)
+{
+	return dllist_init(malloc(sizeof (dllist)), clone_move, free);
 }

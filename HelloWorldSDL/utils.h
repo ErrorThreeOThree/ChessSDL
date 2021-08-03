@@ -5,15 +5,21 @@
 
 #include "types.h"
 
+typedef struct dllist_elem dllist_elem;
+
 typedef struct dllist {
-	void *data;
-	struct dllist *next;
-	struct dllist *prev;
+	dllist_elem *head;
+	dllist_elem *tail;
+
+	void *(*clone_data) (const void *);
+	void (*free_data) (void *);
 } dllist;
 
-dllist **dllist_insert_tail(dllist **list, void *data);
+dllist *dllist_init(dllist *list, void *(*clone_data) (const void *), void (*free_data) (void *));
 
-void dllist_destroy(dllist *list, bool free_data);
+dllist *dllist_insert_tail(dllist *list, void *data);
+
+void dllist_clear_elems(dllist *list);
 
 dllist *dllist_filter(dllist *list, bool (filter_fn (void *data)));
 
@@ -23,6 +29,6 @@ u64 dllist_size(const dllist *list);
 
 dllist *ddlist_concat(dllist *front, dllist *end);
 
-dllist **dllist_insert_head(dllist **list, void *data);
+dllist *dllist_insert_head(dllist *list, void *data);
 
 #endif
