@@ -56,6 +56,7 @@ typedef struct {
 	bool black_castle_l_possible;
 	bool black_castle_r_possible;
 	piece board[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
+	dllist allowed_moves[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH];
 } chess_state;
 
 typedef struct {

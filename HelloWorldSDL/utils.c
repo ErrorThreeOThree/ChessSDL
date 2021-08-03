@@ -21,7 +21,7 @@ dllist *ddlist_init(dllist *list, void *(*clone_data) (const void *), void (*fre
 }
 
 // removes all elements from end
-dllist *ddlist_concat(dllist *front, dllist *end)
+dllist *dllist_concat(dllist *front, dllist *end)
 {
 	ASSERT_WARNING (front->clone_data == end->clone_data && front->free_data == end->free_data, "Lists might be of different type!");
 	if (!end->head) {

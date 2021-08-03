@@ -27,7 +27,7 @@ bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)));
 
 u64 dllist_size(const dllist *list);
 
-dllist *ddlist_concat(dllist *front, dllist *end);
+dllist *dllist_concat(dllist *front, dllist *end);
 
 dllist *dllist_insert_head(dllist *list, void *data);
 
