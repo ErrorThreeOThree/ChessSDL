@@ -38,7 +38,6 @@ typedef enum {
 
 static inline const char *piece_type_string(piece_type t)
 {
-	return NULL;
 	static const char *s[] = { "none", "pawn", "rook", "knight", "bishop", "queen", "king", "invalid" };
 	ASSERT_WARNING (PIECE_TYPE_MAX == t, "Invalid value PIECE_TYPE_MAX");
 	return s[t];
