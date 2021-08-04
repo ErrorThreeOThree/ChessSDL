@@ -60,6 +60,7 @@ void log_this(
 	long line,
 	const char* fmt, ...)
 {
+#ifndef RELEASE
 	va_list args;
 
 	va_start(args, fmt);
@@ -76,4 +77,5 @@ void log_this(
 	vprintf(fmt, args);
 	printf("\n");
 	va_end(args);
+#endif
 }

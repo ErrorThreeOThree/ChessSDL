@@ -31,4 +31,6 @@ dllist *dllist_concat(dllist *front, dllist *end);
 
 dllist *dllist_insert_head(dllist *list, void *data);
 
+dllist *dllist_apply(dllist *list, void (*apply) (void *));
+
 #endif

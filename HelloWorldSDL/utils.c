@@ -156,7 +156,7 @@ bool dllist_exists(const dllist *list, bool (exists_fn (const void *data)))
 {
 	dllist_elem *iter;
 	for (iter = list->head; iter; iter = iter->next) {
-		if (exists_fn(list)) {
+		if (exists_fn(iter->data)) {
 			return true;
 		}
 	}
@@ -181,6 +181,15 @@ dllist *dllist_init(dllist *list, void *(*clone_data) (const void *), void (*fre
 	list->head = NULL;
 	list->tail = NULL;
 	
+	return list;
+}
+
+dllist *dllist_apply(dllist *list, void (*apply) (void *))
+{
+	dllist_elem *iter;
+	for (iter = list->head; iter; iter = iter->next) {
+		apply(iter->data);
+	}
 	return list;
 }
 

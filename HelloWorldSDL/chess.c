@@ -11,7 +11,7 @@ typedef enum {
 	TARGET_ALLY = 1 << 2
 } move_target;
 
-static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
+static dllist *prepare_unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
 static bool filter_check_own_check_after_move(move *m);
 static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
 static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist *moves, move_target target_types);
@@ -19,6 +19,8 @@ static bool check_target_valid(const chess_state *c, pos to, move_target target_
 static dllist *state_valid_moves_starting_from(const chess_state *c, pos p, dllist *moves);
 static move *clone_move(const move *m);
 static dllist *create_movelist(void);
+static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves);
+static void populate_moves_after_move(move *m);
 
 chess * init_chess(chess *c) {
 	pos p;
@@ -89,13 +91,36 @@ dllist *valid_moves_starting_from(const chess *c, pos p)
 dllist *state_valid_moves_starting_from(const chess_state *c, pos p, dllist *moves)
 {
 	unchecked_moves_starting_from(c, p, moves);
-
+	LOG_DEBUG ("Number of unchecked moves: %lu", dllist_size(moves));
 	dllist_filter(moves, &filter_check_own_check_after_move);
+	LOG_DEBUG ("Number of allowed moves: %lu", dllist_size(moves));
 
 	return moves;
 }
 
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
+{
+	prepare_unchecked_moves_starting_from(c, p, moves);
+	dllist_apply(moves, &populate_moves_after_move);
+	return moves;
+}
+
+static void populate_moves_after_move(move *m)
+{
+	pos p;
+	dllist tmp;
+	dllist_init(&tmp, clone_move, free);
+	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
+		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
+			dllist_init(&m->after.allowed_moves[p.y][p.x], clone_move, free);
+			prepare_unchecked_moves_starting_from(&m->after, p, &tmp);
+			dllist_concat(&m->after.allowed_moves[p.y][p.x], &tmp);
+		}
+	}
+
+}
+
+static dllist *prepare_unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
 {
 	u8 x_target, y_target;
 
@@ -107,7 +132,7 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 
 	switch (c->board[p.y][p.x].t) {
 	case PAWN: // TODO test
-		//ASSERT_ERROR (p.y > 0 && p.y < BOARD_SIDE_LENGTH - 1, "%s pawn on invalid rank %hhu", piece_color_string(c->active_color), p.y + 1);
+		ASSERT_ERROR (p.y > 0 && p.y < BOARD_SIDE_LENGTH - 1, "%s pawn on invalid rank %hhu", piece_color_string(c->active_color), p.y + 1);
 
 		if (!(p.y > 0 && p.y < BOARD_SIDE_LENGTH - 1)) {
 				log_this("ERROR  ", __TIME__, __FILE__, __func__, __LINE__, "%s pawn on invalid rank %hhu", piece_color_string(c->active_color), p.y + 1);
@@ -250,18 +275,9 @@ static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dll
 
 static bool check_winning_move(const move *m)
 {
-	pos king_pos;
-
-	for (king_pos.y = 0; king_pos.y < BOARD_SIDE_LENGTH; ++king_pos.y) {
-		for (king_pos.x = 0; king_pos.x < BOARD_SIDE_LENGTH; ++king_pos.x) {
-			if (m->after.board[king_pos.y][king_pos.x].c == m->after.active_color && m->after.board[king_pos.y][king_pos.x].t == KING)
-				return true;
-		}
-	}
-	return false;
+	return m->after.board[m->to.y][m->to.x].c == m->after.active_color && m->after.board[m->to.y][m->to.x].t == KING;
 }
 
-// Also populates the allowed_moves field. FIXME Not the best place to do it, but I do not know of a better on atm... 
 static bool filter_check_own_check_after_move(move *m)
 {
 	pos attacker_pos;
@@ -269,9 +285,6 @@ static bool filter_check_own_check_after_move(move *m)
 	ASSERT_ERROR (m, "Argument is NULL");
 	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
 		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
-			dllist_init(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], clone_move, free);
-			tmp = unchecked_moves_starting_from(&m->after, attacker_pos, tmp);
-			dllist_concat(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], tmp);
 			if (dllist_exists(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], &check_winning_move)) {
 				free(tmp);
 				return false;
