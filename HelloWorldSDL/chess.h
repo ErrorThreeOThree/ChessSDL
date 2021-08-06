@@ -66,14 +66,16 @@ typedef struct {
 } move;
 
 typedef struct {
-	dllist *history;
+	dllist history;
 	chess_state current_state;
 } chess;
 
 chess * init_chess(chess *c);
 
-dllist * valid_moves(const chess *c);
+dllist * valid_moves_from(const chess *c, pos p);
 
-dllist *valid_moves_starting_from(const chess *c, pos p);
+bool try_move(chess *c, pos from, pos to);
+
+void print_move(move *m);
 
 #endif

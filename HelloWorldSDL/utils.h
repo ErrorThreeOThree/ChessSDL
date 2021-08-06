@@ -5,7 +5,11 @@
 
 #include "types.h"
 
-typedef struct dllist_elem dllist_elem;
+typedef struct dllist_elem {
+	void *data;
+	struct dllist_elem *next;
+	struct dllist_elem *prev;
+} dllist_elem;
 
 typedef struct dllist {
 	dllist_elem *head;
@@ -32,5 +36,7 @@ dllist *dllist_concat(dllist *front, dllist *end);
 dllist *dllist_insert_head(dllist *list, void *data);
 
 dllist *dllist_apply(dllist *list, void (*apply) (void *));
+
+dllist *dllist_duplicate(const dllist *list);
 
 #endif

@@ -22,9 +22,48 @@ static dllist *create_movelist(void);
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves);
 static void populate_moves_after_move(move *m);
 
+void print_move(move *m)
+{
+	LOG_INFO("Move from (%hhu,%hhu) to (%hhu,%hhu)", m->from.x, m->from.y, m->to.x, m->to.y);
+}
+
+bool try_move(chess *c, pos from, pos to)
+{
+	// find if move exists
+	dllist_elem *iter = c->current_state.allowed_moves[from.y][from.x].head;
+	move *m, *m_copy;
+	pos p;
+	while (iter)
+	{
+		m = (move *) iter->data;
+		if (m->to.x == to.x && m->to.y == to.y) {
+			// Add move to history
+			m_copy = malloc(sizeof (move));
+			ASSERT_ERROR (m_copy, "calloc returned NULL!");
+			ASSERT_ERROR (memcpy(m_copy, m, sizeof (move)), "memcpy returned NULL!");
+			dllist_insert_head(&c->history, m_copy);
+
+			// set after state as current state
+			ASSERT_ERROR (memcpy(&c->current_state, &m->after, sizeof (chess_state)), "memcpy returned NULL!");
+			for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
+				for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
+					if (dllist_size(&c->current_state.allowed_moves[p.y][p.x]) > 0) {
+						LOG_DEBUG ("list size at (%hhu,%hhu) after the new move: %lu", p.x, p.y, dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
+						dllist_filter(&c->current_state.allowed_moves[p.y][p.x], &filter_check_own_check_after_move);
+						LOG_DEBUG ("list size at (%hhu,%hhu) after the new move after filtering: %lu", p.x, p.y, dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
+					}
+				}
+			}
+			return true;
+		}
+		iter = iter->next;
+	}
+	return false;
+}
+
 chess * init_chess(chess *c) {
 	pos p;
-	dllist *tmp;
+	move *tmp;
 	chess initial_state = {
 		.current_state = (chess_state)
 		{
@@ -45,57 +84,34 @@ chess * init_chess(chess *c) {
 				{(piece) { BLACK, ROOK }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, BISHOP }, (piece) { BLACK, QUEEN }, (piece) { BLACK, KING }, (piece) { BLACK, BISHOP }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, ROOK }},
 			}
 		},
-		.history = NULL
 	};
 
+	dllist_init(&initial_state.history, clone_move, free);
+	
 	ASSERT_ERROR (c, "Argument c was NULL");
 	ASSERT_ERROR (memcpy(c, &initial_state, sizeof (chess_state)), "memcpy returned NULL");
+	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
+		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
+			dllist_init(&c->current_state.allowed_moves[p.y][p.x], clone_move, free);
+		}
+	}
 
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			dllist_init(&c->current_state.allowed_moves[p.y][p.x], clone_move, free);
-			tmp = valid_moves_starting_from(c, p);
-			dllist_concat(&c->current_state.allowed_moves[p.y][p.x], tmp);
-			free(tmp);
+			unchecked_moves_starting_from(&c->current_state, p, &c->current_state.allowed_moves[p.y][p.x]);
+			LOG_INFO ("list size before filter_check_own_check_after_move %hhu", dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
+			dllist_filter(&c->current_state.allowed_moves[p.y][p.x], &filter_check_own_check_after_move);
+			LOG_INFO ("list size after filter_check_own_check_after_move %hhu", dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
 		}
 	}
 
 	return c;
 }
 
-dllist *valid_moves(const chess *c)
+dllist *valid_moves_from(const chess *c, pos p)
 {
-	pos p;
-	dllist *new_moves = create_movelist();
-	dllist *moves = create_movelist();
-
-	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
-		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
-			state_valid_moves_starting_from(&c->current_state, p, new_moves);
-			dllist_concat(moves, new_moves);
-			printf("Number of new moves: %llu\n", dllist_size(new_moves));
-			printf("Number of total moves: %llu\n", dllist_size(moves));
-			dllist_clear_elems(new_moves);
-		}
-	}
-	return moves;
-}
-
-dllist *valid_moves_starting_from(const chess *c, pos p)
-{
-	dllist *moves = create_movelist();
-	return state_valid_moves_starting_from(&c->current_state, p, moves);
-}
-
-
-dllist *state_valid_moves_starting_from(const chess_state *c, pos p, dllist *moves)
-{
-	unchecked_moves_starting_from(c, p, moves);
-	LOG_DEBUG ("Number of unchecked moves: %lu", dllist_size(moves));
-	dllist_filter(moves, &filter_check_own_check_after_move);
-	LOG_DEBUG ("Number of allowed moves: %lu", dllist_size(moves));
-
-	return moves;
+	return dllist_duplicate(&c->current_state.allowed_moves[p.y][p.x]);
 }
 
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
@@ -108,13 +124,10 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 static void populate_moves_after_move(move *m)
 {
 	pos p;
-	dllist tmp;
-	dllist_init(&tmp, clone_move, free);
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			dllist_init(&m->after.allowed_moves[p.y][p.x], clone_move, free);
-			prepare_unchecked_moves_starting_from(&m->after, p, &tmp);
-			dllist_concat(&m->after.allowed_moves[p.y][p.x], &tmp);
+			prepare_unchecked_moves_starting_from(&m->after, p, &m->after.allowed_moves[p.y][p.x]);
 		}
 	}
 
@@ -247,6 +260,7 @@ static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dll
 {
 	move *m;
 	dllist *tmp = create_movelist();
+	pos p;
 
 	if (check_target_valid(c, to, target_types)) {
 		m = calloc(1, sizeof (move));
@@ -257,6 +271,8 @@ static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dll
 		m->after.board[from.y][from.x].c = NONE;
 		m->after.board[from.y][from.x].t = EMPTY;
 		m->after.active_color = (m->before.active_color == WHITE) ? BLACK : WHITE;
+		memcpy(&m->from, &from, sizeof (pos));
+		memcpy(&m->to, &to, sizeof (pos));
 
 		if (WHITE == m->before.active_color) {
 			m->after.white_castle_l_possible |= (from.x == 0 && from.y == 0 || from.x == 4 && from.y == 0);
@@ -281,17 +297,14 @@ static bool check_winning_move(const move *m)
 static bool filter_check_own_check_after_move(move *m)
 {
 	pos attacker_pos;
-	dllist *tmp = create_movelist();
 	ASSERT_ERROR (m, "Argument is NULL");
 	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
 		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
 			if (dllist_exists(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], &check_winning_move)) {
-				free(tmp);
 				return false;
 			}
 		}
 	}
-	free(tmp);
 	return true;
 }
 

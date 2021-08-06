@@ -4,12 +4,6 @@
 #include "log.h"
 #include "types.h"
 
-struct dllist_elem {
-	void *data;
-	struct dllist_elem *next;
-	struct dllist_elem *prev;
-};
-
 static dllist_elem *create_elem(const dllist *list, const void *data, dllist_elem *prev, dllist_elem *next);
 
 dllist *ddlist_init(dllist *list, void *(*clone_data) (const void *), void (*free_data) (void *))
@@ -191,6 +185,21 @@ dllist *dllist_apply(dllist *list, void (*apply) (void *))
 		apply(iter->data);
 	}
 	return list;
+}
+
+dllist *dllist_duplicate(const dllist *list)
+{
+	dllist *duplicate = calloc(1, sizeof(dllist));
+	ASSERT_ERROR (duplicate, "calloc returned NULL!");
+	dllist_elem *list_iter;
+	duplicate->clone_data = list->clone_data;
+	duplicate->free_data = list->free_data;
+
+	for (list_iter = list->head; list_iter != NULL; list_iter = list_iter->next) {
+		dllist_insert_head(duplicate, duplicate->clone_data(list_iter->data));
+	}
+	
+	return duplicate;
 }
 
 static dllist_elem *create_elem(const dllist *list, const void *data, dllist_elem *prev, dllist_elem *next)
