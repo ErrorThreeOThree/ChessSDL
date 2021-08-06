@@ -62,7 +62,6 @@ chess *init_chess(chess *c) {
 
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
-			dllist_init(&c->current_state.allowed_moves[p.y][p.x], clone_move, free);
 			unchecked_moves_starting_from(&c->current_state, p, &c->current_state.allowed_moves[p.y][p.x]);
 
 			unchecked_to_actual_moves(&c->current_state.allowed_moves[p.y][p.x]);
@@ -112,9 +111,9 @@ dllist *valid_moves_from(const chess *c, pos p)
 static dllist *unchecked_to_actual_moves(dllist *moves)
 {
 	dllist_apply(moves, &populate_moves_after_move);
-	LOG_INFO ("list size before filter_check_own_check_after_move %hhu", dllist_size(moves));
+	LOG_DEBUG ("list size before filter_check_own_check_after_move %hhu", dllist_size(moves));
 	dllist_filter(moves, &filter_check_own_check_after_move);
-	LOG_INFO ("list size after filter_check_own_check_after_move %hhu", dllist_size(moves));
+	LOG_DEBUG ("list size after filter_check_own_check_after_move %hhu", dllist_size(moves));
 	return moves;
 
 }
