@@ -76,6 +76,6 @@ dllist * valid_moves_from(const chess *c, pos p);
 
 bool try_move(chess *c, pos from, pos to);
 
-void print_move(move *m);
+void print_move(const move *m);
 
 #endif

@@ -11,60 +11,23 @@ typedef enum {
 	TARGET_ALLY = 1 << 2
 } move_target;
 
-static dllist *prepare_unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
+static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
 static bool filter_check_own_check_after_move(move *m);
 static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
 static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist *moves, move_target target_types);
 static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
-static dllist *state_valid_moves_starting_from(const chess_state *c, pos p, dllist *moves);
 static move *clone_move(const move *m);
 static dllist *create_movelist(void);
-static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves);
 static void populate_moves_after_move(move *m);
+static dllist *unchecked_to_actual_moves(dllist *moves);
 
-void print_move(move *m)
+void print_move(const move *m)
 {
 	LOG_INFO("Move from (%hhu,%hhu) to (%hhu,%hhu)", m->from.x, m->from.y, m->to.x, m->to.y);
 }
 
-bool try_move(chess *c, pos from, pos to)
-{
-	// find if move exists
-	dllist_elem *iter = c->current_state.allowed_moves[from.y][from.x].head;
-	move *m, *m_copy;
+chess *init_chess(chess *c) {
 	pos p;
-	while (iter)
-	{
-		m = (move *) iter->data;
-		if (m->to.x == to.x && m->to.y == to.y) {
-			// Add move to history
-			m_copy = malloc(sizeof (move));
-			ASSERT_ERROR (m_copy, "calloc returned NULL!");
-			ASSERT_ERROR (memcpy(m_copy, m, sizeof (move)), "memcpy returned NULL!");
-			dllist_insert_head(&c->history, m_copy);
-
-			// set after state as current state
-			ASSERT_ERROR (memcpy(&c->current_state, &m->after, sizeof (chess_state)), "memcpy returned NULL!");
-			for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
-				for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
-					if (dllist_size(&c->current_state.allowed_moves[p.y][p.x]) > 0) {
-						LOG_DEBUG ("list size at (%hhu,%hhu) after the new move: %lu", p.x, p.y, dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
-						dllist_filter(&c->current_state.allowed_moves[p.y][p.x], &filter_check_own_check_after_move);
-						LOG_DEBUG ("list size at (%hhu,%hhu) after the new move after filtering: %lu", p.x, p.y, dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
-						dllist_apply(&c->current_state.allowed_moves[p.y][p.x], &populate_moves_after_move);
-					}
-				}
-			}
-			return true;
-		}
-		iter = iter->next;
-	}
-	return false;
-}
-
-chess * init_chess(chess *c) {
-	pos p;
-	move *tmp;
 	chess initial_state = {
 		.current_state = (chess_state)
 		{
@@ -88,7 +51,7 @@ chess * init_chess(chess *c) {
 	};
 
 	dllist_init(&initial_state.history, clone_move, free);
-	
+
 	ASSERT_ERROR (c, "Argument c was NULL");
 	ASSERT_ERROR (memcpy(c, &initial_state, sizeof (chess_state)), "memcpy returned NULL");
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
@@ -101,13 +64,44 @@ chess * init_chess(chess *c) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			dllist_init(&c->current_state.allowed_moves[p.y][p.x], clone_move, free);
 			unchecked_moves_starting_from(&c->current_state, p, &c->current_state.allowed_moves[p.y][p.x]);
-			LOG_INFO ("list size before filter_check_own_check_after_move %hhu", dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
-			dllist_filter(&c->current_state.allowed_moves[p.y][p.x], &filter_check_own_check_after_move);
-			LOG_INFO ("list size after filter_check_own_check_after_move %hhu", dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
+
+			unchecked_to_actual_moves(&c->current_state.allowed_moves[p.y][p.x]);
 		}
 	}
 
 	return c;
+}
+
+bool try_move(chess *c, pos from, pos to)
+{
+	// find if move exists
+	dllist_elem *iter = c->current_state.allowed_moves[from.y][from.x].head;
+	move *m, *m_copy;
+	pos p;
+	while (iter)
+	{
+		m = (move *) iter->data;
+		if (m->to.x == to.x && m->to.y == to.y) {
+			// Add move to history
+			m_copy = malloc(sizeof (move));
+			ASSERT_ERROR (m_copy, "calloc returned NULL!");
+			ASSERT_ERROR (memcpy(m_copy, m, sizeof (move)), "memcpy returned NULL!");
+			dllist_insert_head(&c->history, m_copy);
+
+			// set after state as current state
+			ASSERT_ERROR (memcpy(&c->current_state, &m->after, sizeof (chess_state)), "memcpy returned NULL!");
+			for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
+				for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
+					if (dllist_size(&c->current_state.allowed_moves[p.y][p.x]) > 0) {
+						unchecked_to_actual_moves(&c->current_state.allowed_moves[p.y][p.x]);
+					}
+				}
+			}
+			return true;
+		}
+		iter = iter->next;
+	}
+	return false;
 }
 
 dllist *valid_moves_from(const chess *c, pos p)
@@ -115,11 +109,14 @@ dllist *valid_moves_from(const chess *c, pos p)
 	return dllist_duplicate(&c->current_state.allowed_moves[p.y][p.x]);
 }
 
-static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
+static dllist *unchecked_to_actual_moves(dllist *moves)
 {
-	prepare_unchecked_moves_starting_from(c, p, moves);
 	dllist_apply(moves, &populate_moves_after_move);
+	LOG_INFO ("list size before filter_check_own_check_after_move %hhu", dllist_size(moves));
+	dllist_filter(moves, &filter_check_own_check_after_move);
+	LOG_INFO ("list size after filter_check_own_check_after_move %hhu", dllist_size(moves));
 	return moves;
+
 }
 
 static void populate_moves_after_move(move *m)
@@ -128,13 +125,13 @@ static void populate_moves_after_move(move *m)
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			dllist_init(&m->after.allowed_moves[p.y][p.x], clone_move, free);
-			prepare_unchecked_moves_starting_from(&m->after, p, &m->after.allowed_moves[p.y][p.x]);
+			unchecked_moves_starting_from(&m->after, p, &m->after.allowed_moves[p.y][p.x]);
 		}
 	}
 
 }
 
-static dllist *prepare_unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
+static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
 {
 	u8 x_target, y_target;
 
@@ -261,7 +258,6 @@ static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dll
 {
 	move *m;
 	dllist *tmp = create_movelist();
-	pos p;
 
 	if (check_target_valid(c, to, target_types)) {
 		m = calloc(1, sizeof (move));
