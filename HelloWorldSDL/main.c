@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 	LOG_INFO ("");
 	cnt = 0;
 
-	ASSERT_ERROR(try_move(&c, (pos) { 1, 1 }, (pos) { 1, 3 }), "try_move returned false!");
+	ASSERT_ERROR (try_move(&c, (pos) { 1, 1 }, (pos) { 1, 3 }), "try_move returned false!");
 
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {

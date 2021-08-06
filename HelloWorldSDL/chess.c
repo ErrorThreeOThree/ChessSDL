@@ -51,6 +51,7 @@ bool try_move(chess *c, pos from, pos to)
 						LOG_DEBUG ("list size at (%hhu,%hhu) after the new move: %lu", p.x, p.y, dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
 						dllist_filter(&c->current_state.allowed_moves[p.y][p.x], &filter_check_own_check_after_move);
 						LOG_DEBUG ("list size at (%hhu,%hhu) after the new move after filtering: %lu", p.x, p.y, dllist_size(&c->current_state.allowed_moves[p.y][p.x]));
+						dllist_apply(&c->current_state.allowed_moves[p.y][p.x], &populate_moves_after_move);
 					}
 				}
 			}
