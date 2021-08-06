@@ -144,11 +144,6 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 	case PAWN: // TODO test
 		ASSERT_ERROR (p.y > 0 && p.y < BOARD_SIDE_LENGTH - 1, "%s pawn on invalid rank %hhu", piece_color_string(c->active_color), p.y + 1);
 
-		if (!(p.y > 0 && p.y < BOARD_SIDE_LENGTH - 1)) {
-				log_this("ERROR  ", __TIME__, __FILE__, __func__, __LINE__, "%s pawn on invalid rank %hhu", piece_color_string(c->active_color), p.y + 1);
-				exit(EXIT_FAILURE);
-		}
-
 		// check move one straight
 		if (add_move_if_target_valid(c, p, (pos) { p.x, p.y + (c->active_color == WHITE ? 1 : (-1)) }, moves, TARGET_EMPTY)) {
 			// check double moves from beginning rank
