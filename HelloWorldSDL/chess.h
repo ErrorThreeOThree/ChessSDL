@@ -21,7 +21,7 @@ typedef enum {
 static inline const char *piece_color_string(piece_color c)
 {
 	static const char *s[] = { "none", "white", "black", "invalid" };
-	ASSERT_WARNING (PIECE_COLOR_MAX == c, "Invalid value PIECE_COLOR_MAX");
+	ASSERT_WARNING (PIECE_COLOR_MAX != c, "Invalid value PIECE_COLOR_MAX");
 	return s[c];
 }
 
@@ -39,7 +39,7 @@ typedef enum {
 static inline const char *piece_type_string(piece_type t)
 {
 	static const char *s[] = { "none", "pawn", "rook", "knight", "bishop", "queen", "king", "invalid" };
-	ASSERT_WARNING (PIECE_TYPE_MAX == t, "Invalid value PIECE_TYPE_MAX");
+	ASSERT_WARNING (PIECE_TYPE_MAX != t, "Invalid value PIECE_TYPE_MAX");
 	return s[t];
 }
 
