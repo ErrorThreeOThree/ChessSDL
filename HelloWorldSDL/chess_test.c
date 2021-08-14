@@ -9,7 +9,7 @@ int tests()
 	chess c;
 	pos p;
 	u64 cnt = 0;
-	dllist *moves;
+	const dllist *moves;
 
 	init_chess(&c);
 
@@ -19,7 +19,7 @@ int tests()
 			cnt += dllist_size(moves);
 			if (dllist_size(moves) > 0) {
 				printf("Number of valid moves starting from (%hhu,%hhu): %llu\n", p.x, p.y, dllist_size(moves));
-				dllist_apply(moves, print_move);
+				dllist_apply((dllist *)moves, print_move);
 			}
 		}
 	}
@@ -40,7 +40,7 @@ int tests()
 			cnt += dllist_size(moves);
 			if (dllist_size(moves) > 0) {
 				printf("Number of valid moves starting from (%hhu,%hhu): %llu\n", p.x, p.y, dllist_size(moves));
-				dllist_apply(moves, print_move);
+				dllist_apply((dllist *) moves, print_move);
 			}
 		}
 	}
@@ -61,7 +61,7 @@ int tests()
 			cnt += dllist_size(moves);
 			if (dllist_size(moves) > 0) {
 				printf("Number of valid moves starting from (%hhu,%hhu): %llu\n", p.x, p.y, dllist_size(moves));
-				dllist_apply(moves, print_move);
+				dllist_apply((dllist *) moves, print_move);
 			}
 		}
 	}

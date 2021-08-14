@@ -5,21 +5,15 @@
 #include "log.h"
 #include <stdio.h>
 
-typedef enum {
-	TARGET_EMPTY = 1 << 0,
-	TARGET_ENEMY = 1 << 1,
-	TARGET_ALLY = 1 << 2
-} move_target;
-
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
 static bool filter_check_own_check_after_move(move *m);
-static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
+static move_target check_target_valid(const chess_state *c, pos to, move_target target_types);
 static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist *moves, move_target target_types);
-static bool check_target_valid(const chess_state *c, pos to, move_target target_types);
 static move *clone_move(const move *m);
 static dllist *create_movelist(void);
 static void populate_moves_after_move(move *m);
 static dllist *unchecked_to_actual_moves(dllist *moves);
+static bool check_losing_move(const move *m);
 
 void print_move(const move *m)
 {
@@ -32,21 +26,29 @@ chess *init_chess(chess *c) {
 		.current_state = (chess_state)
 		{
 			.active_color = WHITE,
-			.white_castle_l_possible = true,
-			.white_castle_r_possible = true,
-			.black_castle_l_possible = true,
-			.black_castle_r_possible = true,
+			.can_castle = {{true, true}, {true, true}},
 			.allowed_moves = {0},
+			.can_en_pessant = {0},
 			.board = {
-				{(piece) { WHITE, ROOK }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, BISHOP }, (piece) { WHITE, QUEEN }, (piece) { WHITE, KING }, (piece) { WHITE, BISHOP }, (piece) { WHITE, KNIGHT }, (piece) { WHITE, ROOK }},
-				{(piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }, (piece) { WHITE, PAWN }},
+				{(piece) { true, WHITE, ROOK }, (piece) { true, WHITE, KNIGHT }, (piece) { true, WHITE, BISHOP }, (piece) { true, WHITE, QUEEN }, (piece) { true, WHITE, KING }, (piece) { true, WHITE, BISHOP }, (piece) { true, WHITE, KNIGHT }, (piece) { true, WHITE, ROOK }},
+				{(piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }, (piece) { true, WHITE, PAWN }},
 				{0, 0, 0, 0, 0, 0, 0, 0},
 				{0, 0, 0, 0, 0, 0, 0, 0},
 				{0, 0, 0, 0, 0, 0, 0, 0},
 				{0, 0, 0, 0, 0, 0, 0, 0},
-				{(piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }, (piece) { BLACK, PAWN }},
-				{(piece) { BLACK, ROOK }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, BISHOP }, (piece) { BLACK, QUEEN }, (piece) { BLACK, KING }, (piece) { BLACK, BISHOP }, (piece) { BLACK, KNIGHT }, (piece) { BLACK, ROOK }},
+				{(piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }},
+				{(piece) { true, BLACK, ROOK }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, QUEEN }, (piece) { true, BLACK, KING }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, ROOK }},
 			}
+			//.board = {
+			//	{(piece) { true, WHITE, ROOK }, {0}, {0}, {0}, (piece) { true, WHITE, KING }, {0}, {0}, (piece) { true, WHITE, ROOK }},
+			//	{(piece) { true, WHITE, PAWN }, 0, 0, 0, 0, 0, 0, 0},
+			//	{0, 0, 0, 0, 0, 0, 0, 0},
+			//	{0, 0, 0, 0, 0, 0, 0, 0},
+			//	{0, 0, 0, 0, 0, 0, 0, 0},
+			//	{0, 0, 0, 0, 0, 0, 0, 0},
+			//	{(piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }},
+			//	{(piece) { true, BLACK, ROOK }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, QUEEN }, (piece) { true, BLACK, KING }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, ROOK }},
+			//}
 		},
 	};
 
@@ -63,7 +65,6 @@ chess *init_chess(chess *c) {
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			unchecked_moves_starting_from(&c->current_state, p, &c->current_state.allowed_moves[p.y][p.x]);
-
 			unchecked_to_actual_moves(&c->current_state.allowed_moves[p.y][p.x]);
 		}
 	}
@@ -103,9 +104,9 @@ bool try_move(chess *c, pos from, pos to)
 	return false;
 }
 
-dllist *valid_moves_from(const chess *c, pos p)
+const dllist *valid_moves_from(const chess *c, pos p)
 {
-	return dllist_duplicate(&c->current_state.allowed_moves[p.y][p.x]);
+	return &c->current_state.allowed_moves[p.y][p.x];
 }
 
 static dllist *unchecked_to_actual_moves(dllist *moves)
@@ -114,6 +115,7 @@ static dllist *unchecked_to_actual_moves(dllist *moves)
 	LOG_DEBUG ("list size before filter_check_own_check_after_move %hhu", dllist_size(moves));
 	dllist_filter(moves, &filter_check_own_check_after_move);
 	LOG_DEBUG ("list size after filter_check_own_check_after_move %hhu", dllist_size(moves));
+	dllist_apply(moves, print_move);
 	return moves;
 
 }
@@ -127,7 +129,21 @@ static void populate_moves_after_move(move *m)
 			unchecked_moves_starting_from(&m->after, p, &m->after.allowed_moves[p.y][p.x]);
 		}
 	}
+}
 
+static bool filter_check_own_check_after_move(move *m)
+{
+	pos attacker_pos;
+	ASSERT_ERROR (m, "Argument is NULL");
+	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
+		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
+			dllist_apply(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], print_move);
+			if (dllist_exists(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], &check_losing_move)) {
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
@@ -136,7 +152,7 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 
 	ASSERT_ERROR (c && (p.x < BOARD_SIDE_LENGTH) && (p.y < BOARD_SIDE_LENGTH), "Error invalid arguments");
 
-	if (c->active_color != (c->board[p.y][p.x].c)) {
+	if (!c->board[p.y][p.x].is_piece || c->active_color != (c->board[p.y][p.x].c) || !c->board[p.y][p.x].is_piece) {
 		return moves;
 	}
 
@@ -147,7 +163,8 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 		// check move one straight
 		if (add_move_if_target_valid(c, p, (pos) { p.x, p.y + (c->active_color == WHITE ? 1 : (-1)) }, moves, TARGET_EMPTY)) {
 			// check double moves from beginning rank
-			add_move_if_target_valid(c, p, (pos) { p.x, (c->active_color == WHITE ? 3 : 4) }, moves, TARGET_EMPTY);
+			if (p.y == 1 && c->active_color == WHITE || p.y == 6)
+				add_move_if_target_valid(c, p, (pos) { p.x, (c->active_color == WHITE ? 3 : 4) }, moves, TARGET_EMPTY);
 		}
 
 		// check attacks left and right
@@ -235,68 +252,134 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y + 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
 		add_move_if_target_valid(c, p, (pos) { p.x + 1, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
 		add_move_if_target_valid(c, p, (pos) { p.x - 1, p.y - 1 }, moves, TARGET_ENEMY | TARGET_EMPTY);
+
+		add_move_if_target_valid(c, p, (pos) { p.x - 2, p.y }, moves, CASTLE_L);
+		add_move_if_target_valid(c, p, (pos) { p.x + 2, p.y }, moves, CASTLE_R);
 		break;
 	}
 
 	return moves;
 }
 
-static bool check_target_valid(const chess_state *c, pos to, move_target target_types)
+static move_target check_target_valid(const chess_state *c, pos to, move_target target_types)
 {
-	return (0 <= to.x && to.x < BOARD_SIDE_LENGTH && 0 <= to.y && to.y < BOARD_SIDE_LENGTH)
-		&& ((target_types & TARGET_EMPTY)	&& NONE == c->board[to.y][to.x].c
-			|| ((target_types & TARGET_ENEMY)	&& NONE != c->board[to.y][to.x].c && c->active_color != c->board[to.y][to.x].c));
+	move_target output;
+	piece_color color = c->active_color;
+	if (target_types & CASTLE_L)
+		printf("%d\n", to.y == ((color == WHITE) ? 5 : 2));
+
+	if (!(0 <= to.x && to.x < BOARD_SIDE_LENGTH && 0 <= to.y && to.y < BOARD_SIDE_LENGTH))
+		return TARGET_INVALID;
+
+	if (target_types & TARGET_ENEMY
+		&& c->board[to.y][to.x].is_piece
+		&& c->board[to.y][to.x].c != color)
+	{
+		return TARGET_ENEMY;
+
+	} else if (target_types & TARGET_ENEMY
+		&& !c->board[to.y][to.x].is_piece
+		&& to.y == ((color == WHITE) ? 5 : 2)
+		&& c->can_en_pessant[to.x][color == WHITE ? BLACK : WHITE])
+	{
+		return TARGET_EN_PESSANT | TARGET_ENEMY;
+
+	} else if (target_types & CASTLE_L
+		&& c->can_castle[LEFT][color]
+		&& c->board[(color == WHITE ? 0 : 7)][0].is_piece
+		&& !c->board[(color == WHITE ? 0 : 7)][1].is_piece
+		&& !c->board[(color == WHITE ? 0 : 7)][3].is_piece)
+	{
+		return CASTLE_L;
+
+	} else if (target_types & CASTLE_R
+		&& c->can_castle[RIGHT][color]
+		&& c->board[(color == WHITE ? 0 : 7)][7].is_piece
+		&& !c->board[(color == WHITE ? 0 : 7)][6].is_piece
+		&& !c->board[(color == WHITE ? 0 : 7)][5].is_piece
+		&& c->board[(color == WHITE ? 0 : 7)][4].is_piece)
+	{
+		return CASTLE_R;
+
+	} else if (target_types & TARGET_EMPTY
+			&& !c->board[to.y][to.x].is_piece)
+	{
+		return TARGET_EMPTY;
+	} else {
+		return TARGET_INVALID;
+	}
 }
 
 static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dllist *moves, move_target target_types)
 {
 	move *m;
-	dllist *tmp = create_movelist();
+	u8 x;
+	move_target move_type = check_target_valid(c, to, target_types);
+	piece_color color = c->active_color;
+	int tmp;
 
-	if (check_target_valid(c, to, target_types)) {
+	if (move_type & target_types) {
 		m = calloc(1, sizeof (move));
 		ASSERT_ERROR (m, "calloc returned NULL!");
 		memcpy(&m->before, c, sizeof (chess_state));
 		memcpy(&m->after, c, sizeof (chess_state));
-		m->after.board[to.y][to.x] = m->before.board[from.y][from.x];
-		m->after.board[from.y][from.x].c = NONE;
-		m->after.board[from.y][from.x].t = EMPTY;
-		m->after.active_color = (m->before.active_color == WHITE) ? BLACK : WHITE;
-		memcpy(&m->from, &from, sizeof (pos));
-		memcpy(&m->to, &to, sizeof (pos));
 
-		if (WHITE == m->before.active_color) {
-			m->after.white_castle_l_possible |= (from.x == 0 && from.y == 0 || from.x == 4 && from.y == 0);
-			m->after.white_castle_r_possible |= (from.x == 7 && from.y == 0 || from.x == 4 && from.y == 0);
-		} else if (BLACK == m->before.active_color) {
-			m->after.black_castle_l_possible |= (from.x == 0 && from.y == 7 || from.x == 4 && from.y == 7);
-			m->after.black_castle_r_possible |= (from.x == 7 && from.y == 7 || from.x == 4 && from.y == 7);
+		if (target_types & CASTLE_L) {
+			tmp = (WHITE == color) ? 0 : 7;
+			m->after.board[tmp][0] = (piece) {.is_piece = false, .c = 0, .t = 0};
+			m->after.board[tmp][1] = (piece) {.is_piece = false, .c = 0, .t = 0};
+			m->after.board[tmp][2] = (piece) {.is_piece = true, .c = color, .t = KING};
+			m->after.board[tmp][3] = (piece) {.is_piece = true, .c = color, .t = ROOK };
+			m->after.board[tmp][4] = (piece) {.is_piece = false, .c = 0, .t = 0};
+			m->after.can_castle[LEFT][color] = false;
+			m->after.can_castle[RIGHT][color] = false;
+		} else if (target_types & CASTLE_R) {
+			tmp = (WHITE == color) ? 0 : 7;
+			m->after.board[tmp][7] = (piece) {.is_piece = false, .c = 0, .t = 0};
+			m->after.board[tmp][6] = (piece) {.is_piece = true, .c = color, .t = KING};
+			m->after.board[tmp][5] = (piece) {.is_piece = true, .c = color, .t = ROOK};
+			m->after.board[tmp][4] = (piece) {.is_piece = false, .c = 0, .t = 0};
+			m->after.can_castle[LEFT][color] = false;
+			m->after.can_castle[RIGHT][color] = false;
+		} else {
+			m->after.board[to.y][to.x] = m->before.board[from.y][from.x];
+			m->after.board[from.y][from.x] = (piece) {.is_piece = false, .c = 0, .t = 0};
 		}
 
+		m->after.active_color = (color == WHITE) ? BLACK : WHITE;
+		memcpy(&m->from, &from, sizeof (pos));
+		memcpy(&m->to, &to, sizeof (pos));
+		m->move_type = move_type;
+
+		for (x = 0; x < BOARD_SIDE_LENGTH; ++x) {
+			m->after.can_en_pessant[x][WHITE] = false;
+			m->after.can_en_pessant[x][BLACK] = false;
+		}
+
+		if (2 == abs(from.y - to.y) && m->before.board[from.y][from.x].t == PAWN && m->before.board[from.y][from.x].is_piece) {
+			m->after.can_en_pessant[to.x][color] = true;
+		}
+
+		if (move_type & TARGET_EN_PESSANT) {
+			m->after.board[to.y + ((color == WHITE) ? -1 : 1)][to.x] = (piece) {.is_piece = false, .c = 0, .t = 0};
+		}
+
+		m->after.can_castle[LEFT][WHITE] &= !(from.x == 0 && from.y == 0 || from.x == 4 && from.y == 0 || to.x == 0 && to.y == 0 || to.x == 4 && to.y == 0);
+		m->after.can_castle[LEFT][BLACK] &= !(from.x == 0 && from.y == 7 || from.x == 4 && from.y == 7 || to.x == 0 && to.y == 7 || to.x == 4 && to.y == 7);
+		m->after.can_castle[RIGHT][WHITE] &= !(from.x == 7 && from.y == 7 || from.x == 4 && from.y == 7 || to.x == 7 && to.y == 7 || to.x == 4 && to.y == 7);
+		m->after.can_castle[RIGHT][BLACK] &= !(from.x == 7 && from.y == 7 || from.x == 4 && from.y == 7 || to.x == 7 && to.y == 7 || to.x == 4 && to.y == 7);
+
 		dllist_insert_head(moves, m);
-		free(tmp);
 		return true;
 	}
 	return false;
 }
 
-static bool check_winning_move(const move *m)
-{
-	return m->after.board[m->to.y][m->to.x].c == m->after.active_color && m->after.board[m->to.y][m->to.x].t == KING;
-}
+static bool check_losing_move(const move *m) {
+	return m->before.board[m->to.y][m->to.x].c == m->after.active_color
+		&& m->before.board[m->to.y][m->to.x].t == KING
+		&& m->before.board[m->from.y][m->from.x].c != m->after.active_color;
 
-static bool filter_check_own_check_after_move(move *m)
-{
-	pos attacker_pos;
-	ASSERT_ERROR (m, "Argument is NULL");
-	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
-		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
-			if (dllist_exists(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], &check_winning_move)) {
-				return false;
-			}
-		}
-	}
-	return true;
 }
 
 static move *clone_move(const move *m)

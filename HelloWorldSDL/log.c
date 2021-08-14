@@ -26,24 +26,24 @@ static bool create_log_file(void)
 	// check if log file exists. If yes, move it
 	// TODO moving file does not work, always overrides log file instead
 	printf("Checking if file %s exists...", log_file_name);
-	if (0xFFFFFFFF == GetFileAttributesA(log_file_name)) {
+	//if (0xFFFFFFFF == GetFileAttributesA(log_file_name)) {
 
-		while (!GetFileAttributesA(log_file_name)) {
-			printf("... File %s exists!\n", log_file_name);
-			sprintf(log_file_name, "%s%" PRIu32 "X", LOG_FILE, i);
-			i++;
-		}
-		printf("... File %s does not exists!\n", log_file_name);
-		sprintf(log_file_name, "%s%" PRIu32 "X", LOG_FILE, i);
+	//	while (!GetFileAttributesA(log_file_name)) {
+	//		printf("... File %s exists!\n", log_file_name);
+	//		sprintf(log_file_name, "%s%" PRIu32 "X", LOG_FILE, i);
+	//		i++;
+	//	}
+	//	printf("... File %s does not exists!\n", log_file_name);
+	//	sprintf(log_file_name, "%s%" PRIu32 "X", LOG_FILE, i);
 
-		if (!rename(LOG_FILE, log_file_name)) {
-			printf("ERROR: Could not move log file!\n");
-			goto EXIT_ERROR_CLEANUP;
-		}
-	}
+	//	if (!rename(LOG_FILE, log_file_name)) {
+	//		printf("ERROR: Could not move log file!\n");
+	//		goto EXIT_ERROR_CLEANUP;
+	//	}
+	//}
 
-	log_file = fopen(log_file_name, "w");
-	free(log_file_name);
+	//log_file = fopen(log_file_name, "w");
+	//free(log_file_name);
 	return 1;
 
 EXIT_ERROR_CLEANUP:

@@ -61,7 +61,7 @@ dllist *dllist_insert_head(dllist *list, const void *data)
 	}
 
 	tmp = list->head;
-	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(list), list);
+	//LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(list), list);
 	list->head = create_elem(list, data, NULL, tmp);
 	tmp->prev = list->head;
 
@@ -82,7 +82,7 @@ dllist * dllist_insert_tail(dllist *list, const void *data)
 	}
 
 	tmp = list->tail;
-	LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(list), list);
+	//LOG_DEBUG ("Creating new list element %llu to list %p", dllist_size(list), list);
 	list->tail = create_elem(list, data, tmp, NULL);
 	ASSERT_ERROR (list->tail, "calloc returned NULL!");
 	tmp->next = list->tail;
