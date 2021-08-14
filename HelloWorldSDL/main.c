@@ -7,7 +7,9 @@
 #include "log.h"
 #include "utils.h"
 
-#define BOARD_VERTICAL_OFFSET ((700 - 512) / 2)
+#define TEXTURE_SIZE 64
+#define BOARD_SIZE ((BOARD_SIDE_LENGTH) * TEXTURE_SIZE)
+#define BOARD_VERTICAL_OFFSET ((700 - BOARD_SIZE) / 2)
 
 typedef struct {
 	SDL_Texture *t;
@@ -26,6 +28,19 @@ pos active_field, move_input;
 bool is_active_field, is_move_input;
 
 #define STRING_MAX 256
+
+void screen_pos_to_board_index(i32 x, i32 y, i32 *x_out, i32 *y_out)
+{
+	*x_out = x / TEXTURE_SIZE;
+	*y_out = (- y + BOARD_VERTICAL_OFFSET + BOARD_SIZE) / TEXTURE_SIZE;
+}
+
+void board_index_to_screen_pos(i32 x, i32 y, i32* x_out, i32* y_out)
+{
+	*x_out = x * TEXTURE_SIZE;
+	*y_out = BOARD_SIZE - (y + 1) * TEXTURE_SIZE + BOARD_VERTICAL_OFFSET;
+}
+
 void init_game(chess *c)
 {
 	piece_color player;
@@ -54,11 +69,8 @@ void init_game(chess *c)
 		}
 	}
 
-
-
 	surface = IMG_Load("Sprites/board.png");
 	ASSERT_ERROR(surface, "IMG_Load failed: %s", SDL_GetError());
-
 
 	board_texture = SDL_CreateTextureFromSurface(renderer, surface);
 	SDL_FreeSurface(surface);
@@ -72,10 +84,9 @@ void init_game(chess *c)
 void show_move_option(const move *m)
 {
 	SDL_Rect r;
-	r.x = m->to.x * 64;
-	r.y = m->to.y * 64 + BOARD_VERTICAL_OFFSET;
-	r.w = 64;
-	r.h = 64;
+	board_index_to_screen_pos(m->to.x, m->to.y, &r.x, &r.y);
+	r.w = TEXTURE_SIZE;
+	r.h = TEXTURE_SIZE;
 	ASSERT_ERROR (!SDL_RenderCopy(renderer, highlight_texture, NULL, &r), "SDL_RendererCopy failed: %s", SDL_GetError());
 }
 
@@ -100,18 +111,18 @@ void show_game(const chess *c)
 
 			r.w = piece_textures[p->c][p->t].w / 4;
 			r.h = piece_textures[p->c][p->t].h / 4;
-			r.x = x * 64 + 32 - piece_textures[p->c][p->t].x_center_offset / 4;
-			r.y = y * 64 + BOARD_VERTICAL_OFFSET + 32 - piece_textures[p->c][p->t].y_center_offset / 4;
+			board_index_to_screen_pos(x, y, &r.x, &r.y);
+			r.x += (TEXTURE_SIZE / 2) - piece_textures[p->c][p->t].x_center_offset / 4;
+			r.y += (TEXTURE_SIZE / 2) - piece_textures[p->c][p->t].y_center_offset / 4;
 			ASSERT_ERROR (!SDL_RenderCopy(renderer, piece_textures[p->c][p->t].t, NULL, &r), "SDL_RendererCopy failed: %s", SDL_GetError());
 		}
 	}
 
 
 	if (is_active_field && c->current_state.board[active_field.y][active_field.x].is_piece) {
-		r.x = active_field.x * 64;
-		r.y = active_field.y * 64 + BOARD_VERTICAL_OFFSET;
-		r.w = 64;
-		r.h = 64;
+		board_index_to_screen_pos(active_field.x, active_field.y, &r.x, &r.y);
+		r.w = TEXTURE_SIZE;
+		r.h = TEXTURE_SIZE;
 		ASSERT_ERROR (!SDL_RenderCopy(renderer, highlight_texture, NULL, &r), "SDL_RendererCopy failed: %s", SDL_GetError());
 
 		const dllist *moves = valid_moves_from(c, active_field);
@@ -126,37 +137,33 @@ void show_game(const chess *c)
 
 void process_input(chess *c) {
 	int x, y;
+	int x_board, y_board;
 	SDL_PumpEvents();
 
-	if (SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK) {\
-		if (!is_active_field) {
-			LOG_INFO ("Got mouse click at %d %d", x, y);
-			is_active_field = x >= 0 && x < 64 * 8 && y >= BOARD_VERTICAL_OFFSET && y < 64 * 8 + BOARD_VERTICAL_OFFSET;
-			if (is_active_field) {
-				active_field.x = x / 64;
-				active_field.y = (y - BOARD_VERTICAL_OFFSET) / 64;
-			}
-
-		} else {
-			is_move_input = x >= 0 && x < 64 * 8 && y >= BOARD_VERTICAL_OFFSET && y < 64 * 8 + BOARD_VERTICAL_OFFSET;
-			if (is_move_input) {
-				move_input.x = x / 64;
-				move_input.y = (y - BOARD_VERTICAL_OFFSET) / 64;
+	if (SDL_GetMouseState(&x, &y) & SDL_BUTTON_LMASK) {
+		screen_pos_to_board_index(x, y, &x_board, &y_board);
+		if (!(0 <= x_board && x_board < BOARD_SIDE_LENGTH && 0 <= y_board && y_board < BOARD_SIDE_LENGTH))
+			is_active_field = false;
+		else {
+			if (!is_active_field || (x_board == active_field.x && y_board == active_field.y)) {
+				LOG_INFO("Got mouse click at %d %d", x, y);
+				is_active_field = true;
+				active_field.x = x_board;
+				active_field.y = y_board;
+			} else {
+				is_move_input = true;
+				move_input.x = x_board;
+				move_input.y = y_board;
 				if (!try_move(c, active_field, move_input)) {
 
-					is_active_field = x >= 0 && x < 64 * 8 && y >= BOARD_VERTICAL_OFFSET && y < 64 * 8 + BOARD_VERTICAL_OFFSET;
+					is_active_field = x_board <= 0 && x_board < BOARD_SIDE_LENGTH&& y_board <= 0 && y_board < BOARD_SIDE_LENGTH;
 					if (is_active_field) {
-						active_field.x = x / 64;
-						active_field.y = (y - BOARD_VERTICAL_OFFSET) / 64;
+						active_field.x = x_board;
+						active_field.y = y_board;
 					}
 				}
-			} else {
-				is_active_field = x >= 0 && x < 64 * 8 && y >= BOARD_VERTICAL_OFFSET && y < 64 * 8 + BOARD_VERTICAL_OFFSET;
-				if (is_active_field) {
-					active_field.x = x / 64;
-					active_field.y = (y - BOARD_VERTICAL_OFFSET) / 64;
-				}
 			}
+
 		}
 
 	}

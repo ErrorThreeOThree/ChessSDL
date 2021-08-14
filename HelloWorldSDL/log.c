@@ -26,6 +26,7 @@ static bool create_log_file(void)
 	// check if log file exists. If yes, move it
 	// TODO moving file does not work, always overrides log file instead
 	printf("Checking if file %s exists...", log_file_name);
+	// TODO fixme
 	//if (0xFFFFFFFF == GetFileAttributesA(log_file_name)) {
 
 	//	while (!GetFileAttributesA(log_file_name)) {

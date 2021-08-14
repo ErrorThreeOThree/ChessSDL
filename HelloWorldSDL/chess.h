@@ -8,7 +8,7 @@
 #define BOARD_SIDE_LENGTH 8
 
 typedef struct {
-	u8 x, y;
+	i32 x, y;
 } pos;
 
 typedef enum {

@@ -3,7 +3,6 @@
 
 #include "chess.h"
 #include "log.h"
-#include <stdio.h>
 
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *move);
 static bool filter_check_own_check_after_move(move *m);
@@ -39,16 +38,6 @@ chess *init_chess(chess *c) {
 				{(piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }},
 				{(piece) { true, BLACK, ROOK }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, QUEEN }, (piece) { true, BLACK, KING }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, ROOK }},
 			}
-			//.board = {
-			//	{(piece) { true, WHITE, ROOK }, {0}, {0}, {0}, (piece) { true, WHITE, KING }, {0}, {0}, (piece) { true, WHITE, ROOK }},
-			//	{(piece) { true, WHITE, PAWN }, 0, 0, 0, 0, 0, 0, 0},
-			//	{0, 0, 0, 0, 0, 0, 0, 0},
-			//	{0, 0, 0, 0, 0, 0, 0, 0},
-			//	{0, 0, 0, 0, 0, 0, 0, 0},
-			//	{0, 0, 0, 0, 0, 0, 0, 0},
-			//	{(piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }, (piece) { true, BLACK, PAWN }},
-			//	{(piece) { true, BLACK, ROOK }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, QUEEN }, (piece) { true, BLACK, KING }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, ROOK }},
-			//}
 		},
 	};
 
@@ -148,7 +137,7 @@ static bool filter_check_own_check_after_move(move *m)
 
 static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist *moves)
 {
-	u8 x_target, y_target;
+	i32 x_target, y_target;
 
 	ASSERT_ERROR (c && (p.x < BOARD_SIDE_LENGTH) && (p.y < BOARD_SIDE_LENGTH), "Error invalid arguments");
 
@@ -263,10 +252,7 @@ static dllist *unchecked_moves_starting_from(const chess_state *c, pos p, dllist
 
 static move_target check_target_valid(const chess_state *c, pos to, move_target target_types)
 {
-	move_target output;
 	piece_color color = c->active_color;
-	if (target_types & CASTLE_L)
-		printf("%d\n", to.y == ((color == WHITE) ? 5 : 2));
 
 	if (!(0 <= to.x && to.x < BOARD_SIDE_LENGTH && 0 <= to.y && to.y < BOARD_SIDE_LENGTH))
 		return TARGET_INVALID;
