@@ -39,12 +39,13 @@ chess *init_chess(chess *c) {
 				{(piece) { true, BLACK, ROOK }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, QUEEN }, (piece) { true, BLACK, KING }, (piece) { true, BLACK, BISHOP }, (piece) { true, BLACK, KNIGHT }, (piece) { true, BLACK, ROOK }},
 			}
 		},
+		.is_game_over = false
 	};
 
 	dllist_init(&initial_state.history, clone_move, free);
 
 	ASSERT_ERROR (c, "Argument c was NULL");
-	ASSERT_ERROR (memcpy(c, &initial_state, sizeof (chess_state)), "memcpy returned NULL");
+	ASSERT_ERROR (memcpy(c, &initial_state, sizeof (chess)), "memcpy returned NULL");
 	for (p.y = 0; p.y < BOARD_SIDE_LENGTH; ++p.y) {
 		for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 			dllist_init(&c->current_state.allowed_moves[p.y][p.x], clone_move, free);
@@ -67,6 +68,7 @@ bool try_move(chess *c, pos from, pos to)
 	dllist_elem *iter = c->current_state.allowed_moves[from.y][from.x].head;
 	move *m, *m_copy;
 	pos p;
+	u64 move_num = 0;
 	while (iter)
 	{
 		m = (move *) iter->data;
@@ -83,9 +85,11 @@ bool try_move(chess *c, pos from, pos to)
 				for (p.x = 0; p.x < BOARD_SIDE_LENGTH; ++p.x) {
 					if (dllist_size(&c->current_state.allowed_moves[p.y][p.x]) > 0) {
 						unchecked_to_actual_moves(&c->current_state.allowed_moves[p.y][p.x]);
+						move_num += dllist_size(&c->current_state.allowed_moves[p.y][p.x]);
 					}
 				}
 			}
+			c->is_game_over = (move_num == 0);
 			return true;
 		}
 		iter = iter->next;

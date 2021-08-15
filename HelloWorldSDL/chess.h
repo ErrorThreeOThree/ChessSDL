@@ -82,6 +82,8 @@ typedef struct {
 typedef struct {
 	dllist history;
 	chess_state current_state;
+	bool is_game_over;
+	piece_color winner;
 } chess;
 
 chess * init_chess(chess *c);

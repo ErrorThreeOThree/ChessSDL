@@ -155,7 +155,6 @@ void process_input(chess *c) {
 				move_input.x = x_board;
 				move_input.y = y_board;
 				if (!try_move(c, active_field, move_input)) {
-
 					is_active_field = x_board <= 0 && x_board < BOARD_SIDE_LENGTH&& y_board <= 0 && y_board < BOARD_SIDE_LENGTH;
 					if (is_active_field) {
 						active_field.x = x_board;
@@ -165,7 +164,6 @@ void process_input(chess *c) {
 			}
 
 		}
-
 	}
 }
 
@@ -174,17 +172,15 @@ int main(int argc, char **argv)
 	chess c;
 	LOG_INFO ("Starting program");
 	LOG_DEBUG ("Got arguments:");
-
 	
 	ASSERT_ERROR (!SDL_Init(SDL_INIT_EVERYTHING), "SDL_Init failed: %s", SDL_GetError());
 	init_game(&c);
 
-	while (true) {
+	while (!c.is_game_over) {
 		show_game(&c);
 
 		process_input(&c);
 		SDL_Delay(10);
-
 	}
 
 
