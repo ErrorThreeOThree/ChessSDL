@@ -90,6 +90,21 @@ bool try_move(chess *c, pos from, pos to)
 				}
 			}
 			c->is_game_over = (move_num == 0);
+
+			if (c->is_game_over) {
+				// check if the other player has a check
+				c->current_state.active_color = c->current_state.active_color;
+				c->winner = c->current_state.active_color;
+				c->is_draw = true;
+				for (p.y = 0; p.y < BOARD_SIDE_LENGTH && c->is_draw; ++p.y) {
+					for (p.x = 0; p.x < BOARD_SIDE_LENGTH && c->is_draw; ++p.x) {
+						unchecked_moves_starting_from(&c->current_state, p, &c->current_state.allowed_moves[p.y][p.x]);
+						if (dllist_exists(&c->current_state.allowed_moves[p.y][p.x], check_losing_move)) {
+							c->is_draw = false;
+						}
+					}
+				}
+			}
 			return true;
 		}
 		iter = iter->next;

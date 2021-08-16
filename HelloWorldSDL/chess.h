@@ -83,6 +83,7 @@ typedef struct {
 	dllist history;
 	chess_state current_state;
 	bool is_game_over;
+	bool is_draw;
 	piece_color winner;
 } chess;
 

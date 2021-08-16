@@ -183,6 +183,12 @@ int main(int argc, char **argv)
 		SDL_Delay(10);
 	}
 
+	if (c.is_draw) {
+		LOG_INFO ("Game ended in draw!");
+	} else {
+		LOG_INFO ("%s won!", piece_color_string(c.winner));
+	}
+
 
 	return EXIT_SUCCESS;
 }
