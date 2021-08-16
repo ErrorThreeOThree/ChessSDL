@@ -12,7 +12,7 @@ static move *clone_move(const move *m);
 static dllist *create_movelist(void);
 static void populate_moves_after_move(move *m);
 static dllist *unchecked_to_actual_moves(dllist *moves);
-static bool check_losing_move(const move *m);
+static bool check_winning_move(const move *m);
 
 void print_move(const move *m)
 {
@@ -93,13 +93,13 @@ bool try_move(chess *c, pos from, pos to)
 
 			if (c->is_game_over) {
 				// check if the other player has a check
-				c->current_state.active_color = c->current_state.active_color;
+				c->current_state.active_color = c->current_state.active_color == WHITE ? BLACK : WHITE;
 				c->winner = c->current_state.active_color;
 				c->is_draw = true;
 				for (p.y = 0; p.y < BOARD_SIDE_LENGTH && c->is_draw; ++p.y) {
 					for (p.x = 0; p.x < BOARD_SIDE_LENGTH && c->is_draw; ++p.x) {
 						unchecked_moves_starting_from(&c->current_state, p, &c->current_state.allowed_moves[p.y][p.x]);
-						if (dllist_exists(&c->current_state.allowed_moves[p.y][p.x], check_losing_move)) {
+						if (dllist_exists(&c->current_state.allowed_moves[p.y][p.x], check_winning_move)) {
 							c->is_draw = false;
 						}
 					}
@@ -146,7 +146,7 @@ static bool filter_check_own_check_after_move(move *m)
 	for (attacker_pos.y = 0; attacker_pos.y < BOARD_SIDE_LENGTH; ++attacker_pos.y) {
 		for (attacker_pos.x = 0; attacker_pos.x < BOARD_SIDE_LENGTH; ++attacker_pos.x) {
 			dllist_apply(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], print_move);
-			if (dllist_exists(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], &check_losing_move)) {
+			if (dllist_exists(&m->after.allowed_moves[attacker_pos.y][attacker_pos.x], &check_winning_move)) {
 				return false;
 			}
 		}
@@ -380,7 +380,7 @@ static bool add_move_if_target_valid(const chess_state *c, pos from, pos to, dll
 	return false;
 }
 
-static bool check_losing_move(const move *m) {
+static bool check_winning_move(const move *m) {
 	return m->before.board[m->to.y][m->to.x].c == m->after.active_color
 		&& m->before.board[m->to.y][m->to.x].t == KING
 		&& m->before.board[m->from.y][m->from.x].c != m->after.active_color;
