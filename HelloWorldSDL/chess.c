@@ -92,7 +92,8 @@ bool try_move(chess *c, pos from, pos to)
 			c->is_game_over = (move_num == 0);
 
 			if (c->is_game_over) {
-				// check if the other player has a check
+				// check if the other player has a check on the board
+				// if so, the the player is the winner, else it is a draw
 				c->current_state.active_color = c->current_state.active_color == WHITE ? BLACK : WHITE;
 				c->winner = c->current_state.active_color;
 				c->is_draw = true;
